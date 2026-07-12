@@ -1,0 +1,191 @@
+@page "/mi-perfil"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@using TorneviaWeb.Components.Shared
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Mi Perfil</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p>No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (jugador == null)
+{
+    <p>No se encontró un perfil de jugador asociado a esta cuenta.</p>
+}
+else
+{
+    <div style="max-width: 900px; margin: 30px auto; font-family: sans-serif;">
+
+        <div class="perfil-header">
+            <div class="perfil-header-marca">
+                <LogoTornevia ClaseAdicional="tamano-header" />
+                <strong>TORNEVIA</strong>
+            </div>
+            <div class="perfil-header-usuario">
+                @Sesion.Nombre &nbsp;
+                <button class="btn-tornevia" @onclick="CerrarSesion">Cerrar sesión</button>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:20px; padding:20px; border:1px solid #ddd; border-top:none;">
+
+            <div style="min-width:220px;">
+                <div style="background:linear-gradient(#4a90d9,#2ecc71); height:100px; border-radius:6px 6px 0 0;"></div>
+                <div style="background:white; border:1px solid #eee; border-top:none; padding:15px; text-align:center; border-radius:0 0 6px 6px;">
+                    <strong>@jugador.Nombre_Jugador</strong><br />
+                    <span style="color:gray;">@jugador.Posicion</span><br />
+                    <span style="color:#2c5f8a;">🛡️ @jugador.Equipo?.Nombre_Equipo</span>
+                </div>
+
+                <div style="margin-top:15px; background:#eef4fb; border-radius:6px; overflow:hidden;">
+                    <div style="padding:10px 15px; background:#dce8f7; font-weight:bold;">👤 Mi Perfil</div>
+                    <div style="padding:10px 15px; cursor:pointer;" @onclick="IrAMisEstadisticas">📊 Mis Estadísticas</div>
+                    <div style="padding:10px 15px; cursor:pointer;" @onclick="IrACalendario">📅 Calendario</div>
+                    <div style="padding:10px 15px; cursor:pointer;" @onclick="IrANoticias">📰 Noticias</div>
+                </div>
+            </div>
+
+            <div style="flex:1;">
+                <div style="display:flex; gap:15px; margin-bottom:15px;">
+                    <div style="flex:1; text-align:center; background:white; border:1px solid #eee; border-radius:6px; padding:15px;">
+                        <div style="font-size:1.8rem; color:#27ae60; font-weight:bold;">@totalGoles</div>
+                        <div style="color:gray;">Goles</div>
+                    </div>
+                    <div style="flex:1; text-align:center; background:white; border:1px solid #eee; border-radius:6px; padding:15px;">
+                        <div style="font-size:1.8rem; color:#2980b9; font-weight:bold;">@totalAsistencias</div>
+                        <div style="color:gray;">Asistencias</div>
+                    </div>
+                    <div style="flex:1; text-align:center; background:white; border:1px solid #eee; border-radius:6px; padding:15px;">
+                        <div style="font-size:1.8rem; color:#8e44ad; font-weight:bold;">@totalPartidos</div>
+                        <div style="color:gray;">Partidos</div>
+                    </div>
+                    <div style="flex:1; text-align:center; background:white; border:1px solid #eee; border-radius:6px; padding:15px;">
+                        <div style="font-size:1.8rem; color:#e67e22; font-weight:bold;">@totalAmarillas</div>
+                        <div style="color:gray;">T. Amarillas</div>
+                    </div>
+                </div>
+
+                <div style="background:white; border:1px solid #eee; border-radius:6px; padding:15px;">
+                    <strong>📄 Historial de Partidos</strong>
+                    <table class="tabla-detalle" style="margin-top:10px;">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Partido</th>
+                                <th>Goles</th>
+                                <th>Asistencias</th>
+                                <th>Resultado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var fila in historial)
+                            {
+                                <tr>
+                                    <td>@fila.Fecha.ToString("dd/MM/yyyy")</td>
+                                    <td>@fila.Rival</td>
+                                    <td>@fila.Goles</td>
+                                    <td>@fila.Asistencias</td>
+                                    <td>
+                                        @{
+                                            var clasePill = fila.Resultado == "Victoria" ? "pill-victoria" :
+                                            fila.Resultado == "Empate" ? "pill-empate" : "pill-derrota";
+                                        }
+                                        <span class="pill @clasePill">@fila.Resultado</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private Jugador? jugador;
+    private int totalGoles, totalAsistencias, totalPartidos, totalAmarillas;
+    private List<FilaHistorial> historial = new();
+
+    private class FilaHistorial
+    {
+        public DateTime Fecha { get; set; }
+        public string Rival { get; set; } = string.Empty;
+        public int Goles { get; set; }
+        public int Asistencias { get; set; }
+        public string Resultado { get; set; } = string.Empty;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || Sesion.ID_Usuario == null)
+        {
+            return;
+        }
+
+        jugador = DbContext.Jugadores
+            .Include(j => j.Equipo)
+            .FirstOrDefault(j => j.ID_Usuario == Sesion.ID_Usuario);
+
+        if (jugador == null) return;
+
+        var estadisticas = DbContext.Estadisticas
+            .Include(e => e.Partido)
+            .Where(e => e.ID_Jugador == jugador.ID_Jugador)
+            .ToList();
+
+        totalGoles = estadisticas.Sum(e => e.Goles);
+        totalAsistencias = estadisticas.Sum(e => e.Asistencias);
+        totalAmarillas = estadisticas.Sum(e => e.Tarjetas_Amarillas);
+        totalPartidos = estadisticas.Count;
+
+        foreach (var est in estadisticas)
+        {
+            if (est.Partido == null) continue;
+
+            bool esLocal = est.Partido.Equipo_Local == jugador.ID_Equipo;
+            int idEquipoRival = esLocal ? est.Partido.Equipo_Visitante : est.Partido.Equipo_Local;
+            var equipoRival = DbContext.Equipos.FirstOrDefault(e => e.ID_Equipo == idEquipoRival);
+
+            int golesEquipo = esLocal ? est.Partido.Goles_Local : est.Partido.Goles_Visitante;
+            int golesRival = esLocal ? est.Partido.Goles_Visitante : est.Partido.Goles_Local;
+
+            string resultado = golesEquipo > golesRival ? "Victoria" :
+                                golesEquipo == golesRival ? "Empate" : "Derrota";
+
+            historial.Add(new FilaHistorial
+            {
+                Fecha = est.Partido.Fecha,
+                Rival = $"vs {equipoRival?.Nombre_Equipo ?? "Desconocido"}",
+                Goles = est.Goles,
+                Asistencias = est.Asistencias,
+                Resultado = resultado
+            });
+        }
+
+        historial = historial.OrderByDescending(h => h.Fecha).ToList();
+    }
+
+    private void CerrarSesion()
+    {
+        Sesion.CerrarSesion();
+        Navigation.NavigateTo("/login");
+    }
+    private void IrAMisEstadisticas()
+    {
+        Navigation.NavigateTo("/mis-estadisticas");
+    }
+    private void IrACalendario()
+    {
+        Navigation.NavigateTo("/calendario");
+    }
+    private void IrANoticias()
+    {
+        Navigation.NavigateTo("/noticias");
+    }
+}

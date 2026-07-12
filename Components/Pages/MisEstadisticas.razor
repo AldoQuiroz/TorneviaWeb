@@ -1,0 +1,191 @@
+@page "/mis-estadisticas"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Mis Estadísticas</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (jugador == null)
+{
+    <p class="sin-datos">No se encontró un perfil de jugador asociado a esta cuenta.</p>
+}
+else
+{
+    <div class="stats-container">
+
+        <div class="stats-header">
+            <h2>📊 Mis Estadísticas — @jugador.Nombre_Jugador</h2>
+            <button class="btn-tornevia" @onclick="VolverPerfil">← Volver a Mi Perfil</button>
+        </div>
+
+        <div class="stats-body">
+
+            <div class="resumen-grid">
+                <div class="resumen-card">
+                    <span class="resumen-valor color-goles">@totalGoles</span>
+                    <span class="resumen-label">Goles</span>
+                </div>
+                <div class="resumen-card">
+                    <span class="resumen-valor color-asistencias">@totalAsistencias</span>
+                    <span class="resumen-label">Asistencias</span>
+                </div>
+                <div class="resumen-card">
+                    <span class="resumen-valor color-amarillas">@totalAmarillas</span>
+                    <span class="resumen-label">T. Amarillas</span>
+                </div>
+                <div class="resumen-card">
+                    <span class="resumen-valor color-rojas">@totalRojas</span>
+                    <span class="resumen-label">T. Rojas</span>
+                </div>
+                <div class="resumen-card">
+                    <span class="resumen-valor color-minutos">@totalMinutos</span>
+                    <span class="resumen-label">Minutos jugados</span>
+                </div>
+            </div>
+
+            @if (detalle.Count > 0)
+            {
+                <div class="grafico-titulo">Goles por partido</div>
+                <div class="grafico-barras">
+                    @foreach (var d in detalle)
+                    {
+                        <div class="barra-item">
+                            <div class="barra" style="height:@(AlturaBarra(d.Goles))px;">
+                                <span class="barra-valor">@d.Goles</span>
+                            </div>
+                            <span class="barra-fecha">@d.Fecha.ToString("dd/MM")</span>
+                        </div>
+                    }
+                </div>
+
+                <table class="tabla-detalle">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Rival</th>
+                            <th>Goles</th>
+                            <th>Asistencias</th>
+                            <th>T. Amarillas</th>
+                            <th>T. Rojas</th>
+                            <th>Minutos</th>
+                            <th>Resultado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var d in detalle)
+                        {
+                            <tr>
+                                <td>@d.Fecha.ToString("dd/MM/yyyy")</td>
+                                <td>@d.Rival</td>
+                                <td>@d.Goles</td>
+                                <td>@d.Asistencias</td>
+                                <td>@d.Amarillas</td>
+                                <td>@d.Rojas</td>
+                                <td>@d.Minutos</td>
+                                <td>
+                                    @{
+                                        var claseP = d.Resultado == "Victoria" ? "pill-victoria" :
+                                                     d.Resultado == "Empate" ? "pill-empate" : "pill-derrota";
+                                    }
+                                    <span class="pill @claseP">@d.Resultado</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="sin-datos">Aún no tienes estadísticas registradas.</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private Jugador? jugador;
+    private int totalGoles, totalAsistencias, totalAmarillas, totalRojas, totalMinutos;
+    private List<DetalleEstadistica> detalle = new();
+
+    private class DetalleEstadistica
+    {
+        public DateTime Fecha { get; set; }
+        public string Rival { get; set; } = string.Empty;
+        public int Goles { get; set; }
+        public int Asistencias { get; set; }
+        public int Amarillas { get; set; }
+        public int Rojas { get; set; }
+        public int Minutos { get; set; }
+        public string Resultado { get; set; } = string.Empty;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || Sesion.ID_Usuario == null) return;
+
+        jugador = DbContext.Jugadores
+            .Include(j => j.Equipo)
+            .FirstOrDefault(j => j.ID_Usuario == Sesion.ID_Usuario);
+
+        if (jugador == null) return;
+
+        var estadisticas = DbContext.Estadisticas
+            .Include(e => e.Partido)
+            .Where(e => e.ID_Jugador == jugador.ID_Jugador)
+            .ToList();
+
+        totalGoles = estadisticas.Sum(e => e.Goles);
+        totalAsistencias = estadisticas.Sum(e => e.Asistencias);
+        totalAmarillas = estadisticas.Sum(e => e.Tarjetas_Amarillas);
+        totalRojas = estadisticas.Sum(e => e.Tarjetas_Rojas);
+        totalMinutos = estadisticas.Sum(e => e.Minutos_Jugados);
+
+        foreach (var est in estadisticas)
+        {
+            if (est.Partido == null) continue;
+
+            bool esLocal = est.Partido.Equipo_Local == jugador.ID_Equipo;
+            int idRival = esLocal ? est.Partido.Equipo_Visitante : est.Partido.Equipo_Local;
+            var equipoRival = DbContext.Equipos.FirstOrDefault(e => e.ID_Equipo == idRival);
+
+            int golesEquipo = esLocal ? est.Partido.Goles_Local : est.Partido.Goles_Visitante;
+            int golesRival = esLocal ? est.Partido.Goles_Visitante : est.Partido.Goles_Local;
+
+            string resultado = golesEquipo > golesRival ? "Victoria" :
+                                golesEquipo == golesRival ? "Empate" : "Derrota";
+
+            detalle.Add(new DetalleEstadistica
+            {
+                Fecha = est.Partido.Fecha,
+                Rival = $"vs {equipoRival?.Nombre_Equipo ?? "Desconocido"}",
+                Goles = est.Goles,
+                Asistencias = est.Asistencias,
+                Amarillas = est.Tarjetas_Amarillas,
+                Rojas = est.Tarjetas_Rojas,
+                Minutos = est.Minutos_Jugados,
+                Resultado = resultado
+            });
+        }
+
+        detalle = detalle.OrderByDescending(d => d.Fecha).ToList();
+    }
+
+    private int AlturaBarra(int goles)
+    {
+        int maxGoles = detalle.Count > 0 ? Math.Max(detalle.Max(d => d.Goles), 1) : 1;
+        int alturaMaxima = 140;
+        return Math.Max((goles * alturaMaxima) / maxGoles, 10);
+    }
+
+    private void VolverPerfil()
+    {
+        Navigation.NavigateTo("/mi-perfil");
+    }
+}

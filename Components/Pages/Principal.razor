@@ -1,0 +1,30 @@
+﻿@page "/principal"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Principal</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p>No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else
+{
+    <div style="max-width: 600px; margin: 40px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px;">
+        <h3>⚽ Tornevia</h3>
+        <p>Bienvenido, <strong>@Sesion.Nombre</strong></p>
+        <p>Rol: <strong>@Sesion.Rol</strong></p>
+
+        <button class="btn btn-outline-danger" @onclick="CerrarSesion">Cerrar sesión</button>
+    </div>
+}
+
+@code {
+    private void CerrarSesion()
+    {
+        Sesion.CerrarSesion();
+        Navigation.NavigateTo("/login");
+    }
+}

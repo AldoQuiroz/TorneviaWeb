@@ -1,0 +1,17 @@
+﻿@page "/generar-hash"
+@using TorneviaWeb.Models
+@inject PasswordHasherService PasswordHasher
+
+<h3>Generador de hash temporal</h3>
+
+<p>Hash para "88888888":</p>
+<textarea rows="4" style="width:100%;">@hash</textarea>
+
+@code {
+    private string hash = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        hash = PasswordHasher.HashPassword("88888888");
+    }
+}

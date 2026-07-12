@@ -1,0 +1,160 @@
+@page "/registro"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@using TorneviaWeb.Components.Shared
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject PasswordHasherService PasswordHasher
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Registro</PageTitle>
+
+<div class="login-page">
+    <div class="login-card registro-card">
+        <div class="login-brand">
+            <LogoTornevia />
+            <h1 class="login-marca">TORNEVIA</h1>
+            <p class="login-tagline">Crea tu cuenta de jugador</p>
+        </div>
+
+        <EditForm Model="modelo" OnValidSubmit="HandleRegistro" class="login-form">
+            <DataAnnotationsValidator />
+
+            <label class="login-label">Nombre completo</label>
+            <InputText class="login-input" @bind-Value="modelo.Nombre" placeholder="Ej: Carlos Pérez" />
+
+            <label class="login-label">Correo electrónico</label>
+            <InputText class="login-input" @bind-Value="modelo.Email" placeholder="usuario@correo.com" />
+
+            <label class="login-label">Contraseña</label>
+            <InputText class="login-input" type="password" @bind-Value="modelo.Contrasena" placeholder="Mínimo 6 caracteres" />
+
+            <label class="login-label">Confirmar contraseña</label>
+            <InputText class="login-input" type="password" @bind-Value="modelo.ConfirmarContrasena" placeholder="Repite tu contraseña" />
+
+            <label class="login-label">Equipo</label>
+            <InputSelect class="login-input" @bind-Value="modelo.ID_Equipo">
+                <option value="0">Selecciona tu equipo</option>
+                @foreach (var equipo in equipos)
+                {
+                    <option value="@equipo.ID_Equipo">@equipo.Nombre_Equipo</option>
+                }
+            </InputSelect>
+
+            <label class="login-label">Posición</label>
+            <InputSelect class="login-input" @bind-Value="modelo.Posicion">
+                <option value="">Selecciona tu posición</option>
+                <option value="Portero">Portero</option>
+                <option value="Defensa">Defensa</option>
+                <option value="Mediocampista">Mediocampista</option>
+                <option value="Delantero">Delantero</option>
+            </InputSelect>
+
+            <label class="login-label">Número de camiseta</label>
+            <InputNumber class="login-input" @bind-Value="modelo.Numero_Camiseta" placeholder="Ej: 10" />
+
+            @if (!string.IsNullOrEmpty(mensajeError))
+            {
+                <div class="login-error">@mensajeError</div>
+            }
+
+            @if (!string.IsNullOrEmpty(mensajeExito))
+            {
+                <div class="login-exito">@mensajeExito</div>
+            }
+
+            <button type="submit" class="login-btn">Crear cuenta</button>
+        </EditForm>
+
+        <p class="login-footer">¿Ya tienes cuenta? <a href="/login">Inicia sesión aquí</a></p>
+    </div>
+</div>
+
+@code {
+    private RegistroModel modelo = new();
+    private string? mensajeError;
+    private string? mensajeExito;
+    private List<Equipo> equipos = new();
+
+    private class RegistroModel
+    {
+        public string Nombre { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Contrasena { get; set; } = string.Empty;
+        public string ConfirmarContrasena { get; set; } = string.Empty;
+        public int ID_Equipo { get; set; }
+        public string Posicion { get; set; } = string.Empty;
+        public int? Numero_Camiseta { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        equipos = DbContext.Equipos.OrderBy(e => e.Nombre_Equipo).ToList();
+    }
+
+    private async Task HandleRegistro()
+    {
+        mensajeError = null;
+        mensajeExito = null;
+
+        if (string.IsNullOrWhiteSpace(modelo.Nombre) || string.IsNullOrWhiteSpace(modelo.Email) ||
+            string.IsNullOrWhiteSpace(modelo.Contrasena))
+        {
+            mensajeError = "Debes completar todos los campos obligatorios.";
+            return;
+        }
+
+        if (modelo.Contrasena.Length < 6)
+        {
+            mensajeError = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        if (modelo.Contrasena != modelo.ConfirmarContrasena)
+        {
+            mensajeError = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        if (modelo.ID_Equipo == 0)
+        {
+            mensajeError = "Debes seleccionar un equipo.";
+            return;
+        }
+
+        bool correoExiste = DbContext.Usuarios.Any(u => u.Email == modelo.Email);
+        if (correoExiste)
+        {
+            mensajeError = "Ya existe una cuenta registrada con ese correo.";
+            return;
+        }
+
+        var nuevoUsuario = new Usuario
+        {
+            Nombre = modelo.Nombre,
+            Email = modelo.Email,
+            Contrasena = PasswordHasher.HashPassword(modelo.Contrasena),
+            Rol = "Jugador",
+            Fecha_Registro = DateTime.Now
+        };
+
+        DbContext.Usuarios.Add(nuevoUsuario);
+        await DbContext.SaveChangesAsync();
+
+        var nuevoJugador = new Jugador
+        {
+            Nombre_Jugador = modelo.Nombre,
+            Posicion = modelo.Posicion,
+            Numero_Camiseta = modelo.Numero_Camiseta,
+            ID_Equipo = modelo.ID_Equipo,
+            ID_Usuario = nuevoUsuario.ID_Usuario
+        };
+
+        DbContext.Jugadores.Add(nuevoJugador);
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = "¡Cuenta creada exitosamente! Redirigiendo al login...";
+        await Task.Delay(1800);
+        Navigation.NavigateTo("/login");
+    }
+}

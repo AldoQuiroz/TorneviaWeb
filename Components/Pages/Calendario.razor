@@ -1,0 +1,260 @@
+@page "/calendario"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Calendario</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (jugador == null)
+{
+    <p class="sin-datos">No se encontró un perfil de jugador asociado a esta cuenta.</p>
+}
+else
+{
+    <div class="cal-container">
+
+        <div class="cal-header">
+            <h2>📅 Calendario — @jugador.Equipo?.Nombre_Equipo</h2>
+            <button class="btn-tornevia" @onclick="VolverPerfil">← Volver a Mi Perfil</button>
+        </div>
+
+        <div class="cal-body">
+
+            <div class="cal-nav">
+                <button class="cal-nav-btn" @onclick="MesAnterior">‹</button>
+                <span class="cal-mes-actual">@NombreMes(mesActual) @anioActual</span>
+                <button class="cal-nav-btn" @onclick="MesSiguiente">›</button>
+            </div>
+
+            <div class="cal-grid-dias">
+                <div class="cal-dia-nombre">Lun</div>
+                <div class="cal-dia-nombre">Mar</div>
+                <div class="cal-dia-nombre">Mié</div>
+                <div class="cal-dia-nombre">Jue</div>
+                <div class="cal-dia-nombre">Vie</div>
+                <div class="cal-dia-nombre">Sáb</div>
+                <div class="cal-dia-nombre">Dom</div>
+
+                @foreach (var celda in celdas)
+                {
+                    @if (celda.Dia == 0)
+                    {
+                        <div class="cal-celda cal-celda-vacia"></div>
+                    }
+                    else
+                    {
+                        <div class="cal-celda @(celda.TienePartido ? "cal-celda-partido" : "")">
+                            <span class="cal-numero-dia">@celda.Dia</span>
+                            @if (celda.TienePartido)
+                            {
+                                <span class="cal-punto-partido" title="@celda.DescripcionPartido"></span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
+            <div class="cal-leyenda">
+                <span class="cal-punto-partido cal-punto-leyenda"></span> Día con partido programado o jugado
+            </div>
+
+            <div class="cal-lista-titulo">📋 Detalle de partidos — @NombreMes(mesActual) @anioActual</div>
+
+            @if (partidosDelMes.Count == 0)
+            {
+                <p class="sin-datos">No hay partidos programados este mes.</p>
+            }
+            else
+            {
+                <table class="tabla-detalle">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Partido</th>
+                            <th>Lugar</th>
+                            <th>Estado</th>
+                            <th>Resultado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in partidosDelMes)
+                        {
+                            <tr>
+                                <td>@p.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@p.Descripcion</td>
+                                <td>@p.Lugar</td>
+                                <td>
+                                    @{
+                                        var claseEstado = p.Estado switch
+                                        {
+                                            "Programado" => "pill-empate",
+                                            "EnJuego" => "pill-amarilla",
+                                            "Finalizado" => "pill-victoria",
+                                            _ => "pill-empate"
+                                        };
+                                    }
+                                    <span class="pill @claseEstado">@p.Estado</span>
+                                </td>
+                                <td>@p.Resultado</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private Jugador? jugador;
+    private int mesActual;
+    private int anioActual;
+    private List<CeldaCalendario> celdas = new();
+    private List<PartidoInfo> partidosDelMes = new();
+
+    private class CeldaCalendario
+    {
+        public int Dia { get; set; }
+        public bool TienePartido { get; set; }
+        public string DescripcionPartido { get; set; } = string.Empty;
+    }
+
+    private class PartidoInfo
+    {
+        public DateTime Fecha { get; set; }
+        public string Descripcion { get; set; } = string.Empty;
+        public string? Lugar { get; set; }
+        public string Estado { get; set; } = string.Empty;
+        public string Resultado { get; set; } = string.Empty;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || Sesion.ID_Usuario == null) return;
+
+        jugador = DbContext.Jugadores
+            .Include(j => j.Equipo)
+            .FirstOrDefault(j => j.ID_Usuario == Sesion.ID_Usuario);
+
+        if (jugador == null) return;
+
+        mesActual = DateTime.Now.Month;
+        anioActual = DateTime.Now.Year;
+
+        CargarMes();
+    }
+
+    private void CargarMes()
+    {
+        if (jugador == null) return;
+
+        var partidos = DbContext.Partidos
+            .Where(p => p.Equipo_Local == jugador.ID_Equipo || p.Equipo_Visitante == jugador.ID_Equipo)
+            .Where(p => p.Fecha.Month == mesActual && p.Fecha.Year == anioActual)
+            .ToList();
+
+        var equipos = DbContext.Equipos.ToDictionary(e => e.ID_Equipo, e => e.Nombre_Equipo);
+
+        partidosDelMes = partidos.Select(p =>
+        {
+            bool esLocal = p.Equipo_Local == jugador.ID_Equipo;
+            int idRival = esLocal ? p.Equipo_Visitante : p.Equipo_Local;
+            string nombreRival = equipos.TryGetValue(idRival, out var nom) ? nom : "Desconocido";
+
+            string resultado = "-";
+            if (p.Estado == "Finalizado")
+            {
+                int golesEquipo = esLocal ? p.Goles_Local : p.Goles_Visitante;
+                int golesRival = esLocal ? p.Goles_Visitante : p.Goles_Local;
+                resultado = $"{golesEquipo} - {golesRival}";
+            }
+
+            return new PartidoInfo
+            {
+                Fecha = p.Fecha,
+                Descripcion = $"{(esLocal ? jugador.Equipo?.Nombre_Equipo : nombreRival)} vs {(esLocal ? nombreRival : jugador.Equipo?.Nombre_Equipo)}",
+                Lugar = p.Lugar,
+                Estado = p.Estado,
+                Resultado = resultado
+            };
+        })
+        .OrderBy(p => p.Fecha)
+        .ToList();
+
+        GenerarCeldas();
+    }
+
+    private void GenerarCeldas()
+    {
+        celdas.Clear();
+
+        var primerDiaMes = new DateTime(anioActual, mesActual, 1);
+        int diaSemanaInicio = ((int)primerDiaMes.DayOfWeek + 6) % 7; // Lunes = 0
+        int diasEnMes = DateTime.DaysInMonth(anioActual, mesActual);
+
+        var partidosPorDia = partidosDelMes
+            .GroupBy(p => p.Fecha.Day)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        for (int i = 0; i < diaSemanaInicio; i++)
+        {
+            celdas.Add(new CeldaCalendario { Dia = 0 });
+        }
+
+        for (int dia = 1; dia <= diasEnMes; dia++)
+        {
+            bool tienePartido = partidosPorDia.ContainsKey(dia);
+            string descripcion = tienePartido
+                ? string.Join(" | ", partidosPorDia[dia].Select(p => $"{p.Descripcion} ({p.Fecha:HH:mm})"))
+                : string.Empty;
+
+            celdas.Add(new CeldaCalendario
+            {
+                Dia = dia,
+                TienePartido = tienePartido,
+                DescripcionPartido = descripcion
+            });
+        }
+    }
+
+    private string NombreMes(int mes)
+    {
+        string[] nombres = { "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                              "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
+        return nombres[mes];
+    }
+
+    private void MesAnterior()
+    {
+        mesActual--;
+        if (mesActual < 1)
+        {
+            mesActual = 12;
+            anioActual--;
+        }
+        CargarMes();
+    }
+
+    private void MesSiguiente()
+    {
+        mesActual++;
+        if (mesActual > 12)
+        {
+            mesActual = 1;
+            anioActual++;
+        }
+        CargarMes();
+    }
+
+    private void VolverPerfil()
+    {
+        Navigation.NavigateTo("/mi-perfil");
+    }
+}

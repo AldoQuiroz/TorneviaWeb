@@ -1,0 +1,101 @@
+@page "/noticias"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Noticias</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (jugador == null)
+{
+    <p class="sin-datos">No se encontró un perfil de jugador asociado a esta cuenta.</p>
+}
+else
+{
+    <div class="noticias-container">
+
+        <div class="noticias-header">
+            <h2>📰 Noticias — @nombreTorneo</h2>
+            <button class="btn-tornevia" @onclick="VolverPerfil">← Volver a Mi Perfil</button>
+        </div>
+
+        <div class="noticias-body">
+
+            @if (noticias.Count == 0)
+            {
+                <p class="sin-datos">Aún no hay noticias publicadas para este torneo.</p>
+            }
+            else
+            {
+                @foreach (var n in noticias)
+                {
+                    <div class="noticia-card">
+                        <div class="noticia-fecha">@n.Fecha_Publicacion.ToString("dd MMMM yyyy")</div>
+                        <div class="noticia-titulo">@n.Titulo</div>
+                        <div class="noticia-contenido">@n.Contenido</div>
+                        <div class="noticia-autor">Publicado por @n.Autor</div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private Jugador? jugador;
+    private string nombreTorneo = string.Empty;
+    private List<NoticiaInfo> noticias = new();
+
+    private class NoticiaInfo
+    {
+        public string Titulo { get; set; } = string.Empty;
+        public string? Contenido { get; set; }
+        public DateTime Fecha_Publicacion { get; set; }
+        public string Autor { get; set; } = string.Empty;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || Sesion.ID_Usuario == null) return;
+
+        jugador = DbContext.Jugadores
+            .Include(j => j.Equipo)
+            .FirstOrDefault(j => j.ID_Usuario == Sesion.ID_Usuario);
+
+        if (jugador == null) return;
+
+        var torneoEquipo = DbContext.Torneo_Equipo
+            .Include(te => te.Torneo)
+            .FirstOrDefault(te => te.ID_Equipo == jugador.ID_Equipo);
+
+        if (torneoEquipo?.Torneo == null) return;
+
+        nombreTorneo = torneoEquipo.Torneo.Nombre;
+        int idTorneo = torneoEquipo.Torneo.ID_Torneo;
+
+        var usuarios = DbContext.Usuarios.ToDictionary(u => u.ID_Usuario, u => u.Nombre);
+
+        noticias = DbContext.Noticias
+            .Where(n => n.ID_Torneo == idTorneo)
+            .OrderByDescending(n => n.Fecha_Publicacion)
+            .Select(n => new NoticiaInfo
+            {
+                Titulo = n.Titulo,
+                Contenido = n.Contenido,
+                Fecha_Publicacion = n.Fecha_Publicacion,
+                Autor = usuarios.ContainsKey(n.ID_Usuario) ? usuarios[n.ID_Usuario] : "Administrador"
+            })
+            .ToList();
+    }
+
+    private void VolverPerfil()
+    {
+        Navigation.NavigateTo("/mi-perfil");
+    }
+}

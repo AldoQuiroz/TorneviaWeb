@@ -1,0 +1,88 @@
+﻿@page "/login"
+@rendermode InteractiveServer
+@using TorneviaWeb.Models
+@using TorneviaWeb.Components.Shared
+@inject TorneviaDbContext DbContext
+@inject PasswordHasherService PasswordHasher
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Iniciar Sesión</PageTitle>
+
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-brand">
+            <LogoTornevia />
+            <h1 class="login-marca">TORNEVIA</h1>
+            <p class="login-tagline">Ligas &nbsp;·&nbsp; Torneos &nbsp;·&nbsp; Copas</p>
+        </div>
+
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin" class="login-form">
+            <DataAnnotationsValidator />
+
+            <label class="login-label" for="email">Correo electrónico</label>
+            <InputText id="email" class="login-input" @bind-Value="loginModel.Email" placeholder="usuario@correo.com" />
+
+            <label class="login-label" for="pass">Contraseña</label>
+            <InputText id="pass" class="login-input" type="password" @bind-Value="loginModel.Contrasena" placeholder="••••••••" />
+
+            @if (!string.IsNullOrEmpty(mensajeError))
+            {
+                <div class="login-error">@mensajeError</div>
+            }
+
+            <button type="submit" class="login-btn">Iniciar Sesión</button>
+        </EditForm>
+
+        <p class="login-footer">¿No tienes cuenta? <a href="/registro">Regístrate aquí</a></p>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? mensajeError;
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Contrasena { get; set; } = string.Empty;
+    }
+
+    private async Task HandleLogin()
+    {
+        mensajeError = null;
+
+        if (string.IsNullOrWhiteSpace(loginModel.Email) || string.IsNullOrWhiteSpace(loginModel.Contrasena))
+        {
+            mensajeError = "Debes ingresar correo y contraseña.";
+            return;
+        }
+
+        var usuario = DbContext.Usuarios.FirstOrDefault(u => u.Email == loginModel.Email);
+
+        if (usuario == null)
+        {
+            mensajeError = "El correo ingresado no está registrado.";
+            return;
+        }
+
+        bool esValida = PasswordHasher.VerifyPassword(usuario.Contrasena, loginModel.Contrasena);
+
+        if (!esValida)
+        {
+            mensajeError = "La contraseña ingresada es incorrecta.";
+            return;
+        }
+
+        Sesion.IniciarSesion(usuario);
+
+        if (usuario.Rol == "Jugador")
+        {
+            Navigation.NavigateTo("/mi-perfil");
+        }
+        else
+        {
+            Navigation.NavigateTo("/principal");
+        }
+    }
+}
