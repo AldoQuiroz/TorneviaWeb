@@ -1,0 +1,475 @@
+@page "/admin/torneos"
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Gestión de Torneos</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (!Sesion.EsAdministrador)
+{
+    <p class="sin-datos">No tienes permisos de administrador para acceder a esta sección. <a href="/mi-perfil">Volver a Mi Perfil</a></p>
+}
+else
+{
+    <div class="stats-container">
+
+        <div class="stats-header">
+            <h2>🏆 Gestión de Torneos / Ligas / Copas</h2>
+            <button class="btn-tornevia" @onclick="VolverPanel">← Volver al Panel</button>
+        </div>
+
+        <div class="stats-body">
+
+            @if (!mostrarFormulario)
+            {
+                <button class="btn-primario" @onclick="MostrarFormularioNuevo">+ Crear Nuevo Torneo</button>
+            }
+
+            @if (mostrarFormulario)
+            {
+                <EditForm Model="formModel" OnValidSubmit="GuardarTorneo" class="admin-form">
+                    <DataAnnotationsValidator />
+
+                    <div class="admin-form-titulo">@(modoEdicion ? "Editar Torneo" : "Crear Nuevo Torneo")</div>
+
+                    <div class="admin-form-grid">
+                        <div class="admin-form-campo">
+                            <label class="login-label">Nombre *</label>
+                            <InputText class="login-input" maxlength="100" @bind-Value="formModel.Nombre" placeholder="Ej: Liga Tornevia 2026" />
+                        </div>
+
+                        <div class="admin-form-campo">
+                            <label class="login-label">Tipo *</label>
+                            <InputSelect class="login-input" @bind-Value="formModel.Tipo">
+                                <option value="Liga">Liga</option>
+                                <option value="Copa">Copa</option>
+                            </InputSelect>
+                        </div>
+
+                        <div class="admin-form-campo">
+                            <label class="login-label">Fecha de inicio *</label>
+                            <InputDate class="login-input" @bind-Value="formModel.Fecha_Inicio" />
+                        </div>
+
+                        <div class="admin-form-campo">
+                            <label class="login-label">Fecha de término</label>
+                            <InputDate class="login-input" @bind-Value="formModel.Fecha_Fin" />
+                        </div>
+
+                        <div class="admin-form-campo">
+                            <label class="login-label">Estado *</label>
+                            <InputSelect class="login-input" @bind-Value="formModel.Estado">
+                                <option value="Programado">Programado</option>
+                                <option value="Activo">Activo</option>
+                                <option value="Finalizado">Finalizado</option>
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(mensajeError))
+                    {
+                        <div class="login-error">@mensajeError</div>
+                    }
+
+                    <div class="admin-form-acciones">
+                        <button type="submit" class="btn-primario">Guardar</button>
+                        <button type="button" class="btn-tornevia" @onclick="CancelarFormulario">Cancelar</button>
+                    </div>
+                </EditForm>
+            }
+
+            @if (!string.IsNullOrEmpty(mensajeExito))
+            {
+                <div class="login-exito">@mensajeExito</div>
+            }
+
+            <table class="tabla-detalle" style="margin-top:20px;">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Fechas</th>
+                        <th>Estado</th>
+                        <th>Equipos</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (torneos.Count == 0)
+                    {
+                        <tr><td colspan="6" class="sin-datos">Aún no hay torneos registrados.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var torneo in torneos)
+                        {
+                            <tr>
+                                <td>@torneo.Nombre</td>
+                                <td>@torneo.Tipo</td>
+                                <td>
+                                    @torneo.Fecha_Inicio.ToString("dd/MM/yyyy")
+                                    @(torneo.Fecha_Fin != null ? $" - {torneo.Fecha_Fin:dd/MM/yyyy}" : "")
+                                </td>
+                                <td><span class="pill @ClaseEstado(torneo.Estado)">@torneo.Estado</span></td>
+                                <td>@ObtenerCantidadEquipos(torneo.ID_Torneo)</td>
+                                <td>
+                                    <div class="admin-acciones-tabla">
+                                        <button class="btn-tornevia" @onclick="() => ToggleInscripciones(torneo.ID_Torneo)">
+                                            @(idTorneoExpandido == torneo.ID_Torneo ? "Ocultar equipos" : "Gestionar equipos")
+                                        </button>
+                                        <button class="btn-tornevia" @onclick="() => EditarTorneo(torneo)">Editar</button>
+
+                                        @if (idPendienteEliminar == torneo.ID_Torneo)
+                                        {
+                                            <span class="admin-confirmar-texto">¿Confirmar?</span>
+                                            <button class="btn-peligro" @onclick="() => ConfirmarEliminarTorneo(torneo.ID_Torneo)">Sí, eliminar</button>
+                                            <button class="btn-tornevia" @onclick="CancelarEliminar">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-peligro" @onclick="() => SolicitarEliminarTorneo(torneo.ID_Torneo)">Eliminar</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+
+                            @if (idTorneoExpandido == torneo.ID_Torneo)
+                            {
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="admin-subpanel">
+                                            <strong>Equipos inscritos</strong>
+                                            <div class="tags-equipos">
+                                                @if (equiposInscritos.Count == 0)
+                                                {
+                                                    <span class="sin-datos" style="padding:8px;">Sin equipos inscritos todavía.</span>
+                                                }
+                                                else
+                                                {
+                                                    @foreach (var eq in equiposInscritos)
+                                                    {
+                                                        <span class="tag-equipo">
+                                                            @eq.Nombre_Equipo
+                                                            <button class="tag-equipo-quitar" title="Quitar del torneo" @onclick="() => QuitarEquipo(torneo.ID_Torneo, eq.ID_Equipo)">✕</button>
+                                                        </span>
+                                                    }
+                                                }
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(mensajeErrorInscripcion))
+                                            {
+                                                <div class="login-error" style="margin-top:10px;">@mensajeErrorInscripcion</div>
+                                            }
+
+                                            @if (equiposDisponibles.Count > 0)
+                                            {
+                                                <div class="admin-inscribir-form">
+                                                    <InputSelect class="login-input" @bind-Value="idEquipoAInscribir">
+                                                        <option value="0">Selecciona un equipo para inscribir</option>
+                                                        @foreach (var eq in equiposDisponibles)
+                                                        {
+                                                            <option value="@eq.ID_Equipo">@eq.Nombre_Equipo</option>
+                                                        }
+                                                    </InputSelect>
+                                                    <button class="btn-primario" @onclick="() => InscribirEquipo(torneo.ID_Torneo)">Inscribir</button>
+                                                </div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Torneo> torneos = new();
+    private Dictionary<int, int> equiposPorTorneo = new();
+    private TorneoFormModel formModel = new();
+    private bool mostrarFormulario = false;
+    private bool modoEdicion = false;
+    private int? idPendienteEliminar = null;
+    private string? mensajeError;
+    private string? mensajeExito;
+
+    private int? idTorneoExpandido = null;
+    private List<Equipo> equiposInscritos = new();
+    private List<Equipo> equiposDisponibles = new();
+    private int idEquipoAInscribir = 0;
+    private string? mensajeErrorInscripcion;
+
+    private class TorneoFormModel
+    {
+        public int ID_Torneo { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Tipo { get; set; } = "Liga";
+        public DateTime Fecha_Inicio { get; set; } = DateTime.Today;
+        public DateTime? Fecha_Fin { get; set; }
+        public string Estado { get; set; } = "Programado";
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || !Sesion.EsAdministrador) return;
+        CargarTorneos();
+    }
+
+    private void CargarTorneos()
+    {
+        torneos = DbContext.Torneos.OrderByDescending(t => t.Fecha_Inicio).ToList();
+
+        equiposPorTorneo = DbContext.Torneo_Equipo
+            .GroupBy(te => te.ID_Torneo)
+            .Select(g => new { IdTorneo = g.Key, Cantidad = g.Count() })
+            .ToDictionary(x => x.IdTorneo, x => x.Cantidad);
+    }
+
+    private int ObtenerCantidadEquipos(int idTorneo)
+    {
+        return equiposPorTorneo.TryGetValue(idTorneo, out var cantidad) ? cantidad : 0;
+    }
+
+    private string ClaseEstado(string estado) => estado switch
+    {
+        "Programado" => "pill-empate",
+        "Activo" => "pill-amarilla",
+        "Finalizado" => "pill-victoria",
+        _ => "pill-empate"
+    };
+
+    private void MostrarFormularioNuevo()
+    {
+        formModel = new TorneoFormModel();
+        modoEdicion = false;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+    }
+
+    private void EditarTorneo(Torneo torneo)
+    {
+        formModel = new TorneoFormModel
+        {
+            ID_Torneo = torneo.ID_Torneo,
+            Nombre = torneo.Nombre,
+            Tipo = torneo.Tipo,
+            Fecha_Inicio = torneo.Fecha_Inicio,
+            Fecha_Fin = torneo.Fecha_Fin,
+            Estado = torneo.Estado
+        };
+        modoEdicion = true;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        mensajeError = null;
+    }
+
+    private async Task GuardarTorneo()
+    {
+        mensajeError = null;
+
+        if (string.IsNullOrWhiteSpace(formModel.Nombre))
+        {
+            mensajeError = "Debes ingresar el nombre del torneo.";
+            return;
+        }
+
+        if (!formModel.Nombre.Any(char.IsLetter))
+        {
+            mensajeError = "El nombre del torneo debe contener al menos una letra.";
+            return;
+        }
+
+        if (formModel.Fecha_Fin != null && formModel.Fecha_Fin < formModel.Fecha_Inicio)
+        {
+            mensajeError = "La fecha de término no puede ser anterior a la fecha de inicio.";
+            return;
+        }
+
+        if (modoEdicion)
+        {
+            var torneo = DbContext.Torneos.FirstOrDefault(t => t.ID_Torneo == formModel.ID_Torneo);
+            if (torneo == null)
+            {
+                mensajeError = "El torneo que intentas editar ya no existe.";
+                return;
+            }
+
+            torneo.Nombre = formModel.Nombre.Trim();
+            torneo.Tipo = formModel.Tipo;
+            torneo.Fecha_Inicio = formModel.Fecha_Inicio;
+            torneo.Fecha_Fin = formModel.Fecha_Fin;
+            torneo.Estado = formModel.Estado;
+        }
+        else
+        {
+            var nuevoTorneo = new Torneo
+            {
+                Nombre = formModel.Nombre.Trim(),
+                Tipo = formModel.Tipo,
+                Fecha_Inicio = formModel.Fecha_Inicio,
+                Fecha_Fin = formModel.Fecha_Fin,
+                Estado = formModel.Estado,
+                ID_Administrador = Sesion.ID_Usuario!.Value
+            };
+
+            DbContext.Torneos.Add(nuevoTorneo);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = modoEdicion ? "Torneo actualizado exitosamente." : "Torneo creado exitosamente.";
+        mostrarFormulario = false;
+        CargarTorneos();
+    }
+
+    private void SolicitarEliminarTorneo(int idTorneo)
+    {
+        idPendienteEliminar = idTorneo;
+        mensajeError = null;
+        mensajeExito = null;
+    }
+
+    private void CancelarEliminar()
+    {
+        idPendienteEliminar = null;
+    }
+
+    private async Task ConfirmarEliminarTorneo(int idTorneo)
+    {
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+
+        bool tienePartidos = DbContext.Partidos.Any(p => p.ID_Torneo == idTorneo);
+        if (tienePartidos)
+        {
+            mensajeError = "No se puede eliminar el torneo porque tiene partidos programados o registrados.";
+            return;
+        }
+
+        var noticiasAsociadas = DbContext.Noticias.Where(n => n.ID_Torneo == idTorneo);
+        foreach (var noticia in noticiasAsociadas)
+        {
+            noticia.ID_Torneo = null;
+        }
+
+        var torneo = DbContext.Torneos.FirstOrDefault(t => t.ID_Torneo == idTorneo);
+        if (torneo != null)
+        {
+            DbContext.Torneos.Remove(torneo);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        if (idTorneoExpandido == idTorneo) idTorneoExpandido = null;
+
+        mensajeExito = "Torneo eliminado exitosamente.";
+        CargarTorneos();
+    }
+
+    private void ToggleInscripciones(int idTorneo)
+    {
+        mensajeErrorInscripcion = null;
+
+        if (idTorneoExpandido == idTorneo)
+        {
+            idTorneoExpandido = null;
+            return;
+        }
+
+        idTorneoExpandido = idTorneo;
+        CargarInscripciones(idTorneo);
+    }
+
+    private void CargarInscripciones(int idTorneo)
+    {
+        var idsInscritos = DbContext.Torneo_Equipo
+            .Where(te => te.ID_Torneo == idTorneo)
+            .Select(te => te.ID_Equipo)
+            .ToList();
+
+        equiposInscritos = DbContext.Equipos
+            .Where(e => idsInscritos.Contains(e.ID_Equipo))
+            .OrderBy(e => e.Nombre_Equipo)
+            .ToList();
+
+        equiposDisponibles = DbContext.Equipos
+            .Where(e => !idsInscritos.Contains(e.ID_Equipo))
+            .OrderBy(e => e.Nombre_Equipo)
+            .ToList();
+
+        idEquipoAInscribir = 0;
+    }
+
+    private async Task InscribirEquipo(int idTorneo)
+    {
+        mensajeErrorInscripcion = null;
+
+        if (idEquipoAInscribir == 0)
+        {
+            mensajeErrorInscripcion = "Debes seleccionar un equipo.";
+            return;
+        }
+
+        DbContext.Torneo_Equipo.Add(new TorneoEquipo
+        {
+            ID_Torneo = idTorneo,
+            ID_Equipo = idEquipoAInscribir,
+            Fecha_Inscripcion = DateTime.Now
+        });
+
+        await DbContext.SaveChangesAsync();
+
+        CargarInscripciones(idTorneo);
+        CargarTorneos();
+    }
+
+    private async Task QuitarEquipo(int idTorneo, int idEquipo)
+    {
+        mensajeErrorInscripcion = null;
+
+        bool tienePartidos = DbContext.Partidos.Any(p => p.ID_Torneo == idTorneo &&
+            (p.Equipo_Local == idEquipo || p.Equipo_Visitante == idEquipo));
+
+        if (tienePartidos)
+        {
+            mensajeErrorInscripcion = "No se puede quitar este equipo porque ya tiene partidos programados en el torneo.";
+            return;
+        }
+
+        var inscripcion = DbContext.Torneo_Equipo
+            .FirstOrDefault(te => te.ID_Torneo == idTorneo && te.ID_Equipo == idEquipo);
+
+        if (inscripcion != null)
+        {
+            DbContext.Torneo_Equipo.Remove(inscripcion);
+            await DbContext.SaveChangesAsync();
+        }
+
+        CargarInscripciones(idTorneo);
+        CargarTorneos();
+    }
+
+    private void VolverPanel()
+    {
+        Navigation.NavigateTo("/principal");
+    }
+}

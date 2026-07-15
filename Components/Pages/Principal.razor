@@ -1,23 +1,67 @@
-﻿@page "/principal"
-@rendermode InteractiveServer
+@page "/principal"
 @using TorneviaWeb.Models
+@using TorneviaWeb.Components.Shared
 @inject SesionUsuario Sesion
 @inject NavigationManager Navigation
 
-<PageTitle>Tornevia - Principal</PageTitle>
+<PageTitle>Tornevia - Panel de Administración</PageTitle>
 
 @if (!Sesion.EstaAutenticado)
 {
-    <p>No has iniciado sesión. <a href="/login">Ir al login</a></p>
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (!Sesion.EsAdministrador)
+{
+    <p class="sin-datos">No tienes permisos de administrador para acceder a esta sección. <a href="/mi-perfil">Volver a Mi Perfil</a></p>
 }
 else
 {
-    <div style="max-width: 600px; margin: 40px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px;">
-        <h3>⚽ Tornevia</h3>
-        <p>Bienvenido, <strong>@Sesion.Nombre</strong></p>
-        <p>Rol: <strong>@Sesion.Rol</strong></p>
+    <div class="stats-container">
 
-        <button class="btn btn-outline-danger" @onclick="CerrarSesion">Cerrar sesión</button>
+        <div class="stats-header">
+            <h2>⚽ Panel de Administración — @Sesion.Nombre</h2>
+            <button class="btn-tornevia" @onclick="CerrarSesion">Cerrar sesión</button>
+        </div>
+
+        <div class="stats-body">
+            <div class="admin-menu-grid">
+                <div class="admin-menu-card" @onclick="IrAGestionEquipos">
+                    <span class="admin-menu-icono">🛡️</span>
+                    <span class="admin-menu-titulo">Gestión de Equipos</span>
+                    <span class="admin-menu-desc">Registrar, editar y eliminar equipos</span>
+                </div>
+
+                <div class="admin-menu-card" @onclick="IrAGestionTorneos">
+                    <span class="admin-menu-icono">🏆</span>
+                    <span class="admin-menu-titulo">Torneos / Ligas / Copas</span>
+                    <span class="admin-menu-desc">Crear torneos e inscribir equipos</span>
+                </div>
+
+                <div class="admin-menu-card" @onclick="IrAGestionJugadores">
+                    <span class="admin-menu-icono">🧑‍🤝‍🧑</span>
+                    <span class="admin-menu-titulo">Jugadores</span>
+                    <span class="admin-menu-desc">Registrar, editar y eliminar jugadores</span>
+                </div>
+
+                <div class="admin-menu-card" @onclick="IrAGestionPartidos">
+                    <span class="admin-menu-icono">📅</span>
+                    <span class="admin-menu-titulo">Partidos</span>
+                    <span class="admin-menu-desc">Programar partidos y resultados</span>
+                </div>
+
+                <div class="admin-menu-card" @onclick="IrAGestionEstadisticas">
+                    <span class="admin-menu-icono">📊</span>
+                    <span class="admin-menu-titulo">Estadísticas</span>
+                    <span class="admin-menu-desc">Registrar el rendimiento de jugadores</span>
+                </div>
+
+                <div class="admin-menu-card" @onclick="IrAGestionNoticias">
+                    <span class="admin-menu-icono">📰</span>
+                    <span class="admin-menu-titulo">Noticias</span>
+                    <span class="admin-menu-desc">Publicar novedades de la liga</span>
+                </div>
+            </div>
+        </div>
     </div>
 }
 
@@ -26,5 +70,35 @@ else
     {
         Sesion.CerrarSesion();
         Navigation.NavigateTo("/login");
+    }
+
+    private void IrAGestionEquipos()
+    {
+        Navigation.NavigateTo("/admin/equipos");
+    }
+
+    private void IrAGestionTorneos()
+    {
+        Navigation.NavigateTo("/admin/torneos");
+    }
+
+    private void IrAGestionJugadores()
+    {
+        Navigation.NavigateTo("/admin/jugadores");
+    }
+
+    private void IrAGestionPartidos()
+    {
+        Navigation.NavigateTo("/admin/partidos");
+    }
+
+    private void IrAGestionEstadisticas()
+    {
+        Navigation.NavigateTo("/admin/estadisticas");
+    }
+
+    private void IrAGestionNoticias()
+    {
+        Navigation.NavigateTo("/admin/noticias");
     }
 }

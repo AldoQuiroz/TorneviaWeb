@@ -1,0 +1,298 @@
+@page "/admin/noticias"
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Gestión de Noticias</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (!Sesion.EsAdministrador)
+{
+    <p class="sin-datos">No tienes permisos de administrador para acceder a esta sección. <a href="/mi-perfil">Volver a Mi Perfil</a></p>
+}
+else
+{
+    <div class="stats-container">
+
+        <div class="stats-header">
+            <h2>📰 Gestión de Noticias</h2>
+            <button class="btn-tornevia" @onclick="VolverPanel">← Volver al Panel</button>
+        </div>
+
+        <div class="stats-body">
+
+            @if (!mostrarFormulario)
+            {
+                <button class="btn-primario" @onclick="MostrarFormularioNuevo">+ Publicar Nueva Noticia</button>
+            }
+
+            @if (mostrarFormulario)
+            {
+                <EditForm Model="formModel" OnValidSubmit="GuardarNoticia" class="admin-form">
+                    <DataAnnotationsValidator />
+
+                    <div class="admin-form-titulo">@(modoEdicion ? "Editar Noticia" : "Publicar Nueva Noticia")</div>
+
+                    <div class="admin-form-grid">
+                        <div class="admin-form-campo admin-form-campo-full">
+                            <label class="login-label">Título *</label>
+                            <InputText class="login-input" maxlength="200" @bind-Value="formModel.Titulo" placeholder="Ej: Inicio de la Liga Tornevia 2026" />
+                        </div>
+
+                        <div class="admin-form-campo admin-form-campo-full">
+                            <label class="login-label">Contenido *</label>
+                            <InputTextArea class="login-input" @bind-Value="formModel.Contenido" rows="5" placeholder="Escribe el contenido de la noticia..." />
+                        </div>
+
+                        <div class="admin-form-campo">
+                            <label class="login-label">Fecha de publicación *</label>
+                            <InputDate class="login-input" @bind-Value="formModel.Fecha_Publicacion" />
+                        </div>
+
+                        <div class="admin-form-campo">
+                            <label class="login-label">Torneo relacionado</label>
+                            <InputSelect class="login-input" @bind-Value="formModel.ID_Torneo">
+                                <option value="0">General (sin torneo)</option>
+                                @foreach (var t in torneos)
+                                {
+                                    <option value="@t.ID_Torneo">@t.Nombre</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(mensajeError))
+                    {
+                        <div class="login-error">@mensajeError</div>
+                    }
+
+                    <div class="admin-form-acciones">
+                        <button type="submit" class="btn-primario">Guardar</button>
+                        <button type="button" class="btn-tornevia" @onclick="CancelarFormulario">Cancelar</button>
+                    </div>
+                </EditForm>
+            }
+
+            @if (!string.IsNullOrEmpty(mensajeExito))
+            {
+                <div class="login-exito">@mensajeExito</div>
+            }
+
+            <table class="tabla-detalle" style="margin-top:20px;">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Título</th>
+                        <th>Torneo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (noticias.Count == 0)
+                    {
+                        <tr><td colspan="4" class="sin-datos">Aún no hay noticias publicadas.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var noticia in noticias)
+                        {
+                            <tr>
+                                <td>@noticia.Fecha_Publicacion.ToString("dd/MM/yyyy")</td>
+                                <td>@noticia.Titulo</td>
+                                <td>@(noticia.ID_Torneo != null ? ObtenerNombreTorneo(noticia.ID_Torneo.Value) : "General")</td>
+                                <td>
+                                    <div class="admin-acciones-tabla">
+                                        <button class="btn-tornevia" @onclick="() => EditarNoticia(noticia)">Editar</button>
+
+                                        @if (idPendienteEliminar == noticia.ID_Noticia)
+                                        {
+                                            <span class="admin-confirmar-texto">¿Confirmar?</span>
+                                            <button class="btn-peligro" @onclick="() => ConfirmarEliminarNoticia(noticia.ID_Noticia)">Sí, eliminar</button>
+                                            <button class="btn-tornevia" @onclick="CancelarEliminar">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-peligro" @onclick="() => SolicitarEliminarNoticia(noticia.ID_Noticia)">Eliminar</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Noticia> noticias = new();
+    private List<Torneo> torneos = new();
+    private NoticiaFormModel formModel = new();
+    private bool mostrarFormulario = false;
+    private bool modoEdicion = false;
+    private int? idPendienteEliminar = null;
+    private string? mensajeError;
+    private string? mensajeExito;
+
+    private class NoticiaFormModel
+    {
+        public int ID_Noticia { get; set; }
+        public string Titulo { get; set; } = string.Empty;
+        public string? Contenido { get; set; }
+        public DateTime Fecha_Publicacion { get; set; } = DateTime.Today;
+        public int ID_Torneo { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || !Sesion.EsAdministrador) return;
+        torneos = DbContext.Torneos.OrderByDescending(t => t.Fecha_Inicio).ToList();
+        CargarNoticias();
+    }
+
+    private void CargarNoticias()
+    {
+        noticias = DbContext.Noticias.OrderByDescending(n => n.Fecha_Publicacion).ToList();
+    }
+
+    private string ObtenerNombreTorneo(int idTorneo)
+    {
+        return torneos.FirstOrDefault(t => t.ID_Torneo == idTorneo)?.Nombre ?? "Desconocido";
+    }
+
+    private void MostrarFormularioNuevo()
+    {
+        formModel = new NoticiaFormModel();
+        modoEdicion = false;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+    }
+
+    private void EditarNoticia(Noticia noticia)
+    {
+        formModel = new NoticiaFormModel
+        {
+            ID_Noticia = noticia.ID_Noticia,
+            Titulo = noticia.Titulo,
+            Contenido = noticia.Contenido,
+            Fecha_Publicacion = noticia.Fecha_Publicacion,
+            ID_Torneo = noticia.ID_Torneo ?? 0
+        };
+        modoEdicion = true;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        mensajeError = null;
+    }
+
+    private async Task GuardarNoticia()
+    {
+        mensajeError = null;
+
+        if (string.IsNullOrWhiteSpace(formModel.Titulo))
+        {
+            mensajeError = "Debes ingresar un título.";
+            return;
+        }
+
+        if (!formModel.Titulo.Any(char.IsLetter))
+        {
+            mensajeError = "El título debe contener al menos una letra.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(formModel.Contenido))
+        {
+            mensajeError = "Debes ingresar el contenido de la noticia.";
+            return;
+        }
+
+        if (!formModel.Contenido.Any(char.IsLetter))
+        {
+            mensajeError = "El contenido debe contener al menos una letra.";
+            return;
+        }
+
+        if (modoEdicion)
+        {
+            var noticia = DbContext.Noticias.FirstOrDefault(n => n.ID_Noticia == formModel.ID_Noticia);
+            if (noticia == null)
+            {
+                mensajeError = "La noticia que intentas editar ya no existe.";
+                return;
+            }
+
+            noticia.Titulo = formModel.Titulo.Trim();
+            noticia.Contenido = formModel.Contenido;
+            noticia.Fecha_Publicacion = formModel.Fecha_Publicacion;
+            noticia.ID_Torneo = formModel.ID_Torneo == 0 ? null : formModel.ID_Torneo;
+        }
+        else
+        {
+            var nuevaNoticia = new Noticia
+            {
+                Titulo = formModel.Titulo.Trim(),
+                Contenido = formModel.Contenido,
+                Fecha_Publicacion = formModel.Fecha_Publicacion,
+                ID_Torneo = formModel.ID_Torneo == 0 ? null : formModel.ID_Torneo,
+                ID_Usuario = Sesion.ID_Usuario!.Value
+            };
+
+            DbContext.Noticias.Add(nuevaNoticia);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = modoEdicion ? "Noticia actualizada exitosamente." : "Noticia publicada exitosamente.";
+        mostrarFormulario = false;
+        CargarNoticias();
+    }
+
+    private void SolicitarEliminarNoticia(int idNoticia)
+    {
+        idPendienteEliminar = idNoticia;
+        mensajeError = null;
+        mensajeExito = null;
+    }
+
+    private void CancelarEliminar()
+    {
+        idPendienteEliminar = null;
+    }
+
+    private async Task ConfirmarEliminarNoticia(int idNoticia)
+    {
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+
+        var noticia = DbContext.Noticias.FirstOrDefault(n => n.ID_Noticia == idNoticia);
+        if (noticia != null)
+        {
+            DbContext.Noticias.Remove(noticia);
+            await DbContext.SaveChangesAsync();
+        }
+
+        mensajeExito = "Noticia eliminada exitosamente.";
+        CargarNoticias();
+    }
+
+    private void VolverPanel()
+    {
+        Navigation.NavigateTo("/principal");
+    }
+}

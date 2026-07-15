@@ -1,5 +1,4 @@
 @page "/registro"
-@rendermode InteractiveServer
 @using TorneviaWeb.Models
 @using TorneviaWeb.Components.Shared
 @using Microsoft.EntityFrameworkCore
@@ -21,10 +20,10 @@
             <DataAnnotationsValidator />
 
             <label class="login-label">Nombre completo</label>
-            <InputText class="login-input" @bind-Value="modelo.Nombre" placeholder="Ej: Carlos Pérez" />
+            <InputText class="login-input" maxlength="100" @bind-Value="modelo.Nombre" placeholder="Ej: Carlos Pérez" />
 
             <label class="login-label">Correo electrónico</label>
-            <InputText class="login-input" @bind-Value="modelo.Email" placeholder="usuario@correo.com" />
+            <InputText class="login-input" type="email" maxlength="150" @bind-Value="modelo.Email" placeholder="usuario@correo.com" />
 
             <label class="login-label">Contraseña</label>
             <InputText class="login-input" type="password" @bind-Value="modelo.Contrasena" placeholder="Mínimo 6 caracteres" />
@@ -51,7 +50,7 @@
             </InputSelect>
 
             <label class="login-label">Número de camiseta</label>
-            <InputNumber class="login-input" @bind-Value="modelo.Numero_Camiseta" placeholder="Ej: 10" />
+            <InputNumber class="login-input" min="1" max="99" @bind-Value="modelo.Numero_Camiseta" placeholder="Ej: 10" />
 
             @if (!string.IsNullOrEmpty(mensajeError))
             {
@@ -101,6 +100,24 @@
             string.IsNullOrWhiteSpace(modelo.Contrasena))
         {
             mensajeError = "Debes completar todos los campos obligatorios.";
+            return;
+        }
+
+        if (!modelo.Nombre.Any(char.IsLetter))
+        {
+            mensajeError = "El nombre debe contener al menos una letra.";
+            return;
+        }
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(modelo.Email.Trim(), @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+        {
+            mensajeError = "Debes ingresar un correo electrónico válido.";
+            return;
+        }
+
+        if (modelo.Numero_Camiseta != null && (modelo.Numero_Camiseta < 1 || modelo.Numero_Camiseta > 99))
+        {
+            mensajeError = "El número de camiseta debe estar entre 1 y 99.";
             return;
         }
 

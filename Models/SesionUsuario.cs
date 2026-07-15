@@ -7,6 +7,7 @@
         public string? Rol { get; set; }
 
         public bool EstaAutenticado => ID_Usuario != null;
+        public bool EsAdministrador => EstaAutenticado && Rol == "Administrador";
 
         public void IniciarSesion(Usuario usuario)
         {

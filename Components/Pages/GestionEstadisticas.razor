@@ -1,0 +1,264 @@
+@page "/admin/estadisticas"
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Gestión de Estadísticas</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (!Sesion.EsAdministrador)
+{
+    <p class="sin-datos">No tienes permisos de administrador para acceder a esta sección. <a href="/mi-perfil">Volver a Mi Perfil</a></p>
+}
+else
+{
+    <div class="stats-container">
+
+        <div class="stats-header">
+            <h2>📊 Gestión de Estadísticas</h2>
+            <button class="btn-tornevia" @onclick="VolverPanel">← Volver al Panel</button>
+        </div>
+
+        <div class="stats-body">
+
+            @if (partidos.Count == 0)
+            {
+                <p class="sin-datos">Debes programar al menos un partido antes de registrar estadísticas. <a href="/admin/partidos">Ir a Gestión de Partidos</a></p>
+            }
+            else
+            {
+                <div class="admin-form-campo" style="max-width:500px;">
+                    <label class="login-label">Selecciona un partido</label>
+                    <InputSelect class="login-input" @bind-Value="idPartidoSeleccionado" @bind-Value:after="CargarFilas">
+                        <option value="0">-- Selecciona un partido --</option>
+                        @foreach (var p in partidos)
+                        {
+                            <option value="@p.ID_Partido">@DescripcionPartido(p)</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                @if (idPartidoSeleccionado != 0)
+                {
+                    @if (filas.Count == 0)
+                    {
+                        <p class="sin-datos">Ninguno de los dos equipos tiene jugadores registrados.</p>
+                    }
+                    else
+                    {
+                        <p class="admin-hint">Los goles totales del marcador se configuran en Gestión de Partidos. Aquí se registran los aportes individuales de cada jugador.</p>
+
+                        <table class="tabla-detalle" style="margin-top:12px;">
+                            <thead>
+                                <tr>
+                                    <th>Jugador</th>
+                                    <th>Equipo</th>
+                                    <th>Goles</th>
+                                    <th>Asistencias</th>
+                                    <th>T. Amarillas</th>
+                                    <th>T. Rojas</th>
+                                    <th>Minutos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var fila in filas)
+                                {
+                                    <tr>
+                                        <td>@fila.NombreJugador</td>
+                                        <td>@fila.NombreEquipo</td>
+                                        <td><input type="number" min="0" max="50" class="login-input input-numero-chico" @bind="fila.Goles" /></td>
+                                        <td><input type="number" min="0" max="50" class="login-input input-numero-chico" @bind="fila.Asistencias" /></td>
+                                        <td><input type="number" min="0" max="2" class="login-input input-numero-chico" @bind="fila.Tarjetas_Amarillas" /></td>
+                                        <td><input type="number" min="0" max="1" class="login-input input-numero-chico" @bind="fila.Tarjetas_Rojas" /></td>
+                                        <td><input type="number" min="0" max="130" class="login-input input-numero-chico" @bind="fila.Minutos_Jugados" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        @if (!string.IsNullOrEmpty(mensajeError))
+                        {
+                            <div class="login-error">@mensajeError</div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(mensajeExito))
+                        {
+                            <div class="login-exito">@mensajeExito</div>
+                        }
+
+                        <div class="admin-form-acciones">
+                            <button class="btn-primario" @onclick="GuardarEstadisticas">Guardar Estadísticas</button>
+                        </div>
+                    }
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<Partido> partidos = new();
+    private Dictionary<int, string> nombresEquipos = new();
+    private Dictionary<int, string> nombresTorneos = new();
+    private int idPartidoSeleccionado = 0;
+    private List<FilaEstadistica> filas = new();
+    private string? mensajeError;
+    private string? mensajeExito;
+
+    private class FilaEstadistica
+    {
+        public int ID_Jugador { get; set; }
+        public string NombreJugador { get; set; } = string.Empty;
+        public string NombreEquipo { get; set; } = string.Empty;
+        public int Goles { get; set; }
+        public int Asistencias { get; set; }
+        public int Tarjetas_Amarillas { get; set; }
+        public int Tarjetas_Rojas { get; set; }
+        public int Minutos_Jugados { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || !Sesion.EsAdministrador) return;
+
+        nombresEquipos = DbContext.Equipos.ToDictionary(e => e.ID_Equipo, e => e.Nombre_Equipo);
+        nombresTorneos = DbContext.Torneos.ToDictionary(t => t.ID_Torneo, t => t.Nombre);
+
+        partidos = DbContext.Partidos.OrderByDescending(p => p.Fecha).ToList();
+    }
+
+    private string DescripcionPartido(Partido p)
+    {
+        string local = nombresEquipos.TryGetValue(p.Equipo_Local, out var l) ? l : "Desconocido";
+        string visitante = nombresEquipos.TryGetValue(p.Equipo_Visitante, out var v) ? v : "Desconocido";
+        string torneo = nombresTorneos.TryGetValue(p.ID_Torneo, out var t) ? t : "Desconocido";
+        return $"{p.Fecha:dd/MM/yyyy} — {local} vs {visitante} ({torneo})";
+    }
+
+    private void CargarFilas()
+    {
+        mensajeError = null;
+        mensajeExito = null;
+        RecargarDatosFilas();
+    }
+
+    private void RecargarDatosFilas()
+    {
+        filas = new();
+
+        if (idPartidoSeleccionado == 0) return;
+
+        var partido = partidos.FirstOrDefault(p => p.ID_Partido == idPartidoSeleccionado);
+        if (partido == null) return;
+
+        var jugadoresEquipos = DbContext.Jugadores
+            .Where(j => j.ID_Equipo == partido.Equipo_Local || j.ID_Equipo == partido.Equipo_Visitante)
+            .OrderBy(j => j.ID_Equipo == partido.Equipo_Visitante)
+            .ThenBy(j => j.Nombre_Jugador)
+            .ToList();
+
+        var estadisticasExistentes = DbContext.Estadisticas
+            .Where(e => e.ID_Partido == idPartidoSeleccionado)
+            .ToDictionary(e => e.ID_Jugador);
+
+        foreach (var jugador in jugadoresEquipos)
+        {
+            estadisticasExistentes.TryGetValue(jugador.ID_Jugador, out var est);
+
+            filas.Add(new FilaEstadistica
+            {
+                ID_Jugador = jugador.ID_Jugador,
+                NombreJugador = jugador.Nombre_Jugador,
+                NombreEquipo = nombresEquipos.TryGetValue(jugador.ID_Equipo, out var nom) ? nom : "Desconocido",
+                Goles = est?.Goles ?? 0,
+                Asistencias = est?.Asistencias ?? 0,
+                Tarjetas_Amarillas = est?.Tarjetas_Amarillas ?? 0,
+                Tarjetas_Rojas = est?.Tarjetas_Rojas ?? 0,
+                Minutos_Jugados = est?.Minutos_Jugados ?? 0
+            });
+        }
+    }
+
+    private async Task GuardarEstadisticas()
+    {
+        mensajeError = null;
+        mensajeExito = null;
+
+        if (idPartidoSeleccionado == 0) return;
+
+        foreach (var fila in filas)
+        {
+            if (fila.Goles < 0 || fila.Asistencias < 0 || fila.Tarjetas_Amarillas < 0
+                || fila.Tarjetas_Rojas < 0 || fila.Minutos_Jugados < 0)
+            {
+                mensajeError = $"Los valores de {fila.NombreJugador} no pueden ser negativos.";
+                return;
+            }
+
+            if (fila.Tarjetas_Amarillas > 2)
+            {
+                mensajeError = $"{fila.NombreJugador} no puede tener más de 2 tarjetas amarillas en un partido.";
+                return;
+            }
+
+            if (fila.Tarjetas_Rojas > 1)
+            {
+                mensajeError = $"{fila.NombreJugador} no puede tener más de 1 tarjeta roja en un partido.";
+                return;
+            }
+
+            if (fila.Minutos_Jugados > 130)
+            {
+                mensajeError = $"Los minutos jugados de {fila.NombreJugador} superan el máximo razonable (130).";
+                return;
+            }
+        }
+
+        var estadisticasExistentes = DbContext.Estadisticas
+            .Where(e => e.ID_Partido == idPartidoSeleccionado)
+            .ToDictionary(e => e.ID_Jugador);
+
+        foreach (var fila in filas)
+        {
+            bool tieneDatos = fila.Goles > 0 || fila.Asistencias > 0 || fila.Tarjetas_Amarillas > 0
+                               || fila.Tarjetas_Rojas > 0 || fila.Minutos_Jugados > 0;
+
+            if (estadisticasExistentes.TryGetValue(fila.ID_Jugador, out var existente))
+            {
+                existente.Goles = fila.Goles;
+                existente.Asistencias = fila.Asistencias;
+                existente.Tarjetas_Amarillas = fila.Tarjetas_Amarillas;
+                existente.Tarjetas_Rojas = fila.Tarjetas_Rojas;
+                existente.Minutos_Jugados = fila.Minutos_Jugados;
+            }
+            else if (tieneDatos)
+            {
+                DbContext.Estadisticas.Add(new Estadistica
+                {
+                    ID_Partido = idPartidoSeleccionado,
+                    ID_Jugador = fila.ID_Jugador,
+                    Goles = fila.Goles,
+                    Asistencias = fila.Asistencias,
+                    Tarjetas_Amarillas = fila.Tarjetas_Amarillas,
+                    Tarjetas_Rojas = fila.Tarjetas_Rojas,
+                    Minutos_Jugados = fila.Minutos_Jugados
+                });
+            }
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = "Estadísticas guardadas exitosamente.";
+        RecargarDatosFilas();
+    }
+
+    private void VolverPanel()
+    {
+        Navigation.NavigateTo("/principal");
+    }
+}

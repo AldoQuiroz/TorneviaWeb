@@ -1,0 +1,488 @@
+@page "/admin/jugadores"
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject PasswordHasherService PasswordHasher
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Gestión de Jugadores</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (!Sesion.EsAdministrador)
+{
+    <p class="sin-datos">No tienes permisos de administrador para acceder a esta sección. <a href="/mi-perfil">Volver a Mi Perfil</a></p>
+}
+else
+{
+    <div class="stats-container">
+
+        <div class="stats-header">
+            <h2>🧑‍🤝‍🧑 Gestión de Jugadores</h2>
+            <button class="btn-tornevia" @onclick="VolverPanel">← Volver al Panel</button>
+        </div>
+
+        <div class="stats-body">
+
+            @if (equipos.Count == 0)
+            {
+                <p class="sin-datos">Debes registrar al menos un equipo antes de poder crear jugadores. <a href="/admin/equipos">Ir a Gestión de Equipos</a></p>
+            }
+            else
+            {
+                @if (!mostrarFormulario)
+                {
+                    <button class="btn-primario" @onclick="MostrarFormularioNuevo">+ Registrar Nuevo Jugador</button>
+                }
+
+                @if (mostrarFormulario)
+                {
+                    <EditForm Model="formModel" OnValidSubmit="GuardarJugador" class="admin-form">
+                        <DataAnnotationsValidator />
+
+                        <div class="admin-form-titulo">@(modoEdicion ? "Editar Jugador" : "Registrar Nuevo Jugador")</div>
+
+                        <div class="admin-form-grid">
+                            <div class="admin-form-campo">
+                                <label class="login-label">Nombre completo *</label>
+                                <InputText class="login-input" maxlength="100" @bind-Value="formModel.Nombre_Jugador" placeholder="Ej: Juan Pérez" />
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Equipo *</label>
+                                <InputSelect class="login-input" @bind-Value="formModel.ID_Equipo">
+                                    <option value="0">Selecciona un equipo</option>
+                                    @foreach (var equipo in equipos)
+                                    {
+                                        <option value="@equipo.ID_Equipo">@equipo.Nombre_Equipo</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Posición</label>
+                                <InputSelect class="login-input" @bind-Value="formModel.Posicion">
+                                    <option value="">Selecciona una posición</option>
+                                    <option value="Portero">Portero</option>
+                                    <option value="Defensa">Defensa</option>
+                                    <option value="Mediocampista">Mediocampista</option>
+                                    <option value="Delantero">Delantero</option>
+                                </InputSelect>
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Número de camiseta</label>
+                                <InputNumber class="login-input" min="1" max="99" @bind-Value="formModel.Numero_Camiseta" placeholder="Ej: 10" />
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeError))
+                        {
+                            <div class="login-error">@mensajeError</div>
+                        }
+
+                        <div class="admin-form-acciones">
+                            <button type="submit" class="btn-primario">Guardar</button>
+                            <button type="button" class="btn-tornevia" @onclick="CancelarFormulario">Cancelar</button>
+                        </div>
+                    </EditForm>
+                }
+
+                @if (!string.IsNullOrEmpty(mensajeExito))
+                {
+                    <div class="login-exito">@mensajeExito</div>
+                }
+
+                <table class="tabla-detalle" style="margin-top:20px;">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Equipo</th>
+                            <th>Posición</th>
+                            <th>N°</th>
+                            <th>Cuenta vinculada</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (jugadores.Count == 0)
+                        {
+                            <tr><td colspan="6" class="sin-datos">Aún no hay jugadores registrados.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var jugador in jugadores)
+                            {
+                                <tr>
+                                    <td>@jugador.Nombre_Jugador</td>
+                                    <td>@(jugador.Equipo?.Nombre_Equipo ?? "-")</td>
+                                    <td>@(string.IsNullOrEmpty(jugador.Posicion) ? "-" : jugador.Posicion)</td>
+                                    <td>@(jugador.Numero_Camiseta?.ToString() ?? "-")</td>
+                                    <td>
+                                        @if (jugador.ID_Usuario != null)
+                                        {
+                                            <span class="pill pill-victoria">Sí</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="pill pill-empate">No</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="admin-acciones-tabla">
+                                            @if (jugador.ID_Usuario == null)
+                                            {
+                                                <button class="btn-tornevia" @onclick="() => MostrarVincular(jugador)">Vincular cuenta</button>
+                                            }
+                                            <button class="btn-tornevia" @onclick="() => EditarJugador(jugador)">Editar</button>
+
+                                            @if (idPendienteEliminar == jugador.ID_Jugador)
+                                            {
+                                                <span class="admin-confirmar-texto">¿Confirmar?</span>
+                                                <button class="btn-peligro" @onclick="() => ConfirmarEliminarJugador(jugador.ID_Jugador)">Sí, eliminar</button>
+                                                <button class="btn-tornevia" @onclick="CancelarEliminar">No</button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn-peligro" @onclick="() => SolicitarEliminarJugador(jugador.ID_Jugador)">Eliminar</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                @if (idJugadorVinculando == jugador.ID_Jugador)
+                                {
+                                    <tr>
+                                        <td colspan="6">
+                                            <div class="admin-subpanel">
+                                                <strong>Vincular cuenta de acceso para @jugador.Nombre_Jugador</strong>
+
+                                                <EditForm Model="vincularModel" OnValidSubmit="GuardarVinculo" class="admin-form" style="margin-top:10px;">
+                                                    <DataAnnotationsValidator />
+
+                                                    <div class="admin-form-grid">
+                                                        <div class="admin-form-campo">
+                                                            <label class="login-label">Correo electrónico *</label>
+                                                            <InputText class="login-input" maxlength="150" @bind-Value="vincularModel.Email" placeholder="usuario@correo.com" />
+                                                        </div>
+
+                                                        <div class="admin-form-campo">
+                                                            <label class="login-label">Contraseña *</label>
+                                                            <InputText class="login-input" type="password" @bind-Value="vincularModel.Contrasena" placeholder="Mínimo 6 caracteres" />
+                                                        </div>
+
+                                                        <div class="admin-form-campo">
+                                                            <label class="login-label">Confirmar contraseña *</label>
+                                                            <InputText class="login-input" type="password" @bind-Value="vincularModel.ConfirmarContrasena" placeholder="Repite la contraseña" />
+                                                        </div>
+                                                    </div>
+
+                                                    @if (!string.IsNullOrEmpty(mensajeErrorVinculo))
+                                                    {
+                                                        <div class="login-error">@mensajeErrorVinculo</div>
+                                                    }
+
+                                                    <div class="admin-form-acciones">
+                                                        <button type="submit" class="btn-primario">Crear acceso</button>
+                                                        <button type="button" class="btn-tornevia" @onclick="CancelarVincular">Cancelar</button>
+                                                    </div>
+                                                </EditForm>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<Jugador> jugadores = new();
+    private List<Equipo> equipos = new();
+    private JugadorFormModel formModel = new();
+    private bool mostrarFormulario = false;
+    private bool modoEdicion = false;
+    private int? idPendienteEliminar = null;
+    private string? mensajeError;
+    private string? mensajeExito;
+
+    private int? idJugadorVinculando = null;
+    private VincularFormModel vincularModel = new();
+    private string? mensajeErrorVinculo;
+
+    private class JugadorFormModel
+    {
+        public int ID_Jugador { get; set; }
+        public string Nombre_Jugador { get; set; } = string.Empty;
+        public string? Posicion { get; set; }
+        public int? Numero_Camiseta { get; set; }
+        public int ID_Equipo { get; set; }
+    }
+
+    private class VincularFormModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Contrasena { get; set; } = string.Empty;
+        public string ConfirmarContrasena { get; set; } = string.Empty;
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || !Sesion.EsAdministrador) return;
+        equipos = DbContext.Equipos.OrderBy(e => e.Nombre_Equipo).ToList();
+        CargarJugadores();
+    }
+
+    private void CargarJugadores()
+    {
+        jugadores = DbContext.Jugadores
+            .Include(j => j.Equipo)
+            .OrderBy(j => j.Nombre_Jugador)
+            .ToList();
+    }
+
+    private void MostrarFormularioNuevo()
+    {
+        formModel = new JugadorFormModel();
+        modoEdicion = false;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+        idJugadorVinculando = null;
+    }
+
+    private void EditarJugador(Jugador jugador)
+    {
+        formModel = new JugadorFormModel
+        {
+            ID_Jugador = jugador.ID_Jugador,
+            Nombre_Jugador = jugador.Nombre_Jugador,
+            Posicion = jugador.Posicion,
+            Numero_Camiseta = jugador.Numero_Camiseta,
+            ID_Equipo = jugador.ID_Equipo
+        };
+        modoEdicion = true;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+        idJugadorVinculando = null;
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        mensajeError = null;
+    }
+
+    private async Task GuardarJugador()
+    {
+        mensajeError = null;
+
+        if (string.IsNullOrWhiteSpace(formModel.Nombre_Jugador))
+        {
+            mensajeError = "Debes ingresar el nombre del jugador.";
+            return;
+        }
+
+        if (!formModel.Nombre_Jugador.Any(char.IsLetter))
+        {
+            mensajeError = "El nombre del jugador debe contener al menos una letra.";
+            return;
+        }
+
+        if (formModel.ID_Equipo == 0)
+        {
+            mensajeError = "Debes seleccionar un equipo.";
+            return;
+        }
+
+        if (formModel.Numero_Camiseta != null && (formModel.Numero_Camiseta < 1 || formModel.Numero_Camiseta > 99))
+        {
+            mensajeError = "El número de camiseta debe estar entre 1 y 99.";
+            return;
+        }
+
+        if (formModel.Numero_Camiseta != null)
+        {
+            bool numeroDuplicado = DbContext.Jugadores
+                .Any(j => j.ID_Equipo == formModel.ID_Equipo
+                          && j.Numero_Camiseta == formModel.Numero_Camiseta
+                          && j.ID_Jugador != formModel.ID_Jugador);
+
+            if (numeroDuplicado)
+            {
+                mensajeError = "Ya existe un jugador con ese número de camiseta en el equipo seleccionado.";
+                return;
+            }
+        }
+
+        if (modoEdicion)
+        {
+            var jugador = DbContext.Jugadores.FirstOrDefault(j => j.ID_Jugador == formModel.ID_Jugador);
+            if (jugador == null)
+            {
+                mensajeError = "El jugador que intentas editar ya no existe.";
+                return;
+            }
+
+            jugador.Nombre_Jugador = formModel.Nombre_Jugador.Trim();
+            jugador.Posicion = formModel.Posicion;
+            jugador.Numero_Camiseta = formModel.Numero_Camiseta;
+            jugador.ID_Equipo = formModel.ID_Equipo;
+        }
+        else
+        {
+            var nuevoJugador = new Jugador
+            {
+                Nombre_Jugador = formModel.Nombre_Jugador.Trim(),
+                Posicion = formModel.Posicion,
+                Numero_Camiseta = formModel.Numero_Camiseta,
+                ID_Equipo = formModel.ID_Equipo,
+                ID_Usuario = null
+            };
+
+            DbContext.Jugadores.Add(nuevoJugador);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = modoEdicion ? "Jugador actualizado exitosamente." : "Jugador registrado exitosamente.";
+        mostrarFormulario = false;
+        CargarJugadores();
+    }
+
+    private void SolicitarEliminarJugador(int idJugador)
+    {
+        idPendienteEliminar = idJugador;
+        idJugadorVinculando = null;
+        mensajeError = null;
+        mensajeExito = null;
+    }
+
+    private void CancelarEliminar()
+    {
+        idPendienteEliminar = null;
+    }
+
+    private async Task ConfirmarEliminarJugador(int idJugador)
+    {
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+
+        bool tieneEstadisticas = DbContext.Estadisticas.Any(e => e.ID_Jugador == idJugador);
+        if (tieneEstadisticas)
+        {
+            mensajeError = "No se puede eliminar el jugador porque tiene estadísticas registradas en partidos.";
+            return;
+        }
+
+        var jugador = DbContext.Jugadores.FirstOrDefault(j => j.ID_Jugador == idJugador);
+        if (jugador != null)
+        {
+            DbContext.Jugadores.Remove(jugador);
+            await DbContext.SaveChangesAsync();
+        }
+
+        mensajeExito = "Jugador eliminado exitosamente.";
+        CargarJugadores();
+    }
+
+    private void MostrarVincular(Jugador jugador)
+    {
+        idJugadorVinculando = jugador.ID_Jugador;
+        vincularModel = new VincularFormModel();
+        mensajeErrorVinculo = null;
+        mostrarFormulario = false;
+        idPendienteEliminar = null;
+    }
+
+    private void CancelarVincular()
+    {
+        idJugadorVinculando = null;
+        mensajeErrorVinculo = null;
+    }
+
+    private async Task GuardarVinculo()
+    {
+        mensajeErrorVinculo = null;
+
+        if (idJugadorVinculando == null) return;
+
+        var jugador = DbContext.Jugadores.FirstOrDefault(j => j.ID_Jugador == idJugadorVinculando);
+        if (jugador == null)
+        {
+            mensajeErrorVinculo = "El jugador ya no existe.";
+            return;
+        }
+
+        if (jugador.ID_Usuario != null)
+        {
+            mensajeErrorVinculo = "Este jugador ya tiene una cuenta vinculada.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(vincularModel.Email) || !EsEmailValido(vincularModel.Email))
+        {
+            mensajeErrorVinculo = "Debes ingresar un correo electrónico válido.";
+            return;
+        }
+
+        if (vincularModel.Contrasena.Length < 6)
+        {
+            mensajeErrorVinculo = "La contraseña debe tener al menos 6 caracteres.";
+            return;
+        }
+
+        if (vincularModel.Contrasena != vincularModel.ConfirmarContrasena)
+        {
+            mensajeErrorVinculo = "Las contraseñas no coinciden.";
+            return;
+        }
+
+        bool correoExiste = DbContext.Usuarios.Any(u => u.Email == vincularModel.Email);
+        if (correoExiste)
+        {
+            mensajeErrorVinculo = "Ya existe una cuenta registrada con ese correo.";
+            return;
+        }
+
+        var nuevoUsuario = new Usuario
+        {
+            Nombre = jugador.Nombre_Jugador,
+            Email = vincularModel.Email.Trim(),
+            Contrasena = PasswordHasher.HashPassword(vincularModel.Contrasena),
+            Rol = "Jugador",
+            Fecha_Registro = DateTime.Now
+        };
+
+        DbContext.Usuarios.Add(nuevoUsuario);
+        await DbContext.SaveChangesAsync();
+
+        jugador.ID_Usuario = nuevoUsuario.ID_Usuario;
+        await DbContext.SaveChangesAsync();
+
+        idJugadorVinculando = null;
+        mensajeExito = $"Cuenta creada y vinculada exitosamente a {jugador.Nombre_Jugador}.";
+        CargarJugadores();
+    }
+
+    private bool EsEmailValido(string email)
+    {
+        return System.Text.RegularExpressions.Regex.IsMatch(email.Trim(), @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+    }
+
+    private void VolverPanel()
+    {
+        Navigation.NavigateTo("/principal");
+    }
+}

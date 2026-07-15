@@ -1,0 +1,408 @@
+@page "/admin/partidos"
+@using TorneviaWeb.Models
+@using Microsoft.EntityFrameworkCore
+@inject TorneviaDbContext DbContext
+@inject SesionUsuario Sesion
+@inject NavigationManager Navigation
+
+<PageTitle>Tornevia - Gestión de Partidos</PageTitle>
+
+@if (!Sesion.EstaAutenticado)
+{
+    <p class="sin-datos">No has iniciado sesión. <a href="/login">Ir al login</a></p>
+}
+else if (!Sesion.EsAdministrador)
+{
+    <p class="sin-datos">No tienes permisos de administrador para acceder a esta sección. <a href="/mi-perfil">Volver a Mi Perfil</a></p>
+}
+else
+{
+    <div class="stats-container">
+
+        <div class="stats-header">
+            <h2>📅 Gestión de Partidos</h2>
+            <button class="btn-tornevia" @onclick="VolverPanel">← Volver al Panel</button>
+        </div>
+
+        <div class="stats-body">
+
+            @if (torneos.Count == 0)
+            {
+                <p class="sin-datos">Debes crear al menos un torneo antes de programar partidos. <a href="/admin/torneos">Ir a Gestión de Torneos</a></p>
+            }
+            else
+            {
+                @if (!mostrarFormulario)
+                {
+                    <button class="btn-primario" @onclick="MostrarFormularioNuevo">+ Programar Nuevo Partido</button>
+                }
+
+                @if (mostrarFormulario)
+                {
+                    <EditForm Model="formModel" OnValidSubmit="GuardarPartido" class="admin-form">
+                        <DataAnnotationsValidator />
+
+                        <div class="admin-form-titulo">@(modoEdicion ? "Editar Partido" : "Programar Nuevo Partido")</div>
+
+                        <div class="admin-form-grid">
+                            <div class="admin-form-campo">
+                                <label class="login-label">Torneo *</label>
+                                <InputSelect class="login-input" @bind-Value="formModel.ID_Torneo" @bind-Value:after="OnTorneoCambiado">
+                                    <option value="0">Selecciona un torneo</option>
+                                    @foreach (var t in torneos)
+                                    {
+                                        <option value="@t.ID_Torneo">@t.Nombre</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Fecha y hora *</label>
+                                <InputDate class="login-input" @bind-Value="formModel.Fecha" Type="InputDateType.DateTimeLocal" />
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Equipo local *</label>
+                                <InputSelect class="login-input" @bind-Value="formModel.Equipo_Local">
+                                    <option value="0">Selecciona equipo local</option>
+                                    @foreach (var eq in equiposDelTorneo)
+                                    {
+                                        <option value="@eq.ID_Equipo">@eq.Nombre_Equipo</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Equipo visitante *</label>
+                                <InputSelect class="login-input" @bind-Value="formModel.Equipo_Visitante">
+                                    <option value="0">Selecciona equipo visitante</option>
+                                    @foreach (var eq in equiposDelTorneo)
+                                    {
+                                        <option value="@eq.ID_Equipo">@eq.Nombre_Equipo</option>
+                                    }
+                                </InputSelect>
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Lugar</label>
+                                <InputText class="login-input" maxlength="150" @bind-Value="formModel.Lugar" placeholder="Ej: Cancha Municipal N°1" />
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Estado *</label>
+                                <InputSelect class="login-input" @bind-Value="formModel.Estado">
+                                    <option value="Programado">Programado</option>
+                                    <option value="EnJuego">En Juego</option>
+                                    <option value="Finalizado">Finalizado</option>
+                                </InputSelect>
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Goles equipo local</label>
+                                <InputNumber class="login-input" min="0" max="50" @bind-Value="formModel.Goles_Local" />
+                            </div>
+
+                            <div class="admin-form-campo">
+                                <label class="login-label">Goles equipo visitante</label>
+                                <InputNumber class="login-input" min="0" max="50" @bind-Value="formModel.Goles_Visitante" />
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(mensajeError))
+                        {
+                            <div class="login-error">@mensajeError</div>
+                        }
+
+                        <div class="admin-form-acciones">
+                            <button type="submit" class="btn-primario">Guardar</button>
+                            <button type="button" class="btn-tornevia" @onclick="CancelarFormulario">Cancelar</button>
+                        </div>
+                    </EditForm>
+                }
+
+                @if (!string.IsNullOrEmpty(mensajeExito))
+                {
+                    <div class="login-exito">@mensajeExito</div>
+                }
+
+                <table class="tabla-detalle" style="margin-top:20px;">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Torneo</th>
+                            <th>Partido</th>
+                            <th>Resultado</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (partidos.Count == 0)
+                        {
+                            <tr><td colspan="6" class="sin-datos">Aún no hay partidos programados.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var partido in partidos)
+                            {
+                                <tr>
+                                    <td>@partido.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td>@ObtenerNombreTorneo(partido.ID_Torneo)</td>
+                                    <td>@ObtenerNombreEquipo(partido.Equipo_Local) vs @ObtenerNombreEquipo(partido.Equipo_Visitante)</td>
+                                    <td>
+                                        @(partido.Estado == "Programado" ? "-" : $"{partido.Goles_Local} - {partido.Goles_Visitante}")
+                                    </td>
+                                    <td><span class="pill @ClaseEstado(partido.Estado)">@partido.Estado</span></td>
+                                    <td>
+                                        <div class="admin-acciones-tabla">
+                                            <button class="btn-tornevia" @onclick="() => EditarPartido(partido)">Editar</button>
+
+                                            @if (idPendienteEliminar == partido.ID_Partido)
+                                            {
+                                                <span class="admin-confirmar-texto">¿Confirmar? (se borrarán sus estadísticas)</span>
+                                                <button class="btn-peligro" @onclick="() => ConfirmarEliminarPartido(partido.ID_Partido)">Sí, eliminar</button>
+                                                <button class="btn-tornevia" @onclick="CancelarEliminar">No</button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn-peligro" @onclick="() => SolicitarEliminarPartido(partido.ID_Partido)">Eliminar</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<Partido> partidos = new();
+    private List<Torneo> torneos = new();
+    private List<Equipo> equipos = new();
+    private List<Equipo> equiposDelTorneo = new();
+    private PartidoFormModel formModel = new();
+    private bool mostrarFormulario = false;
+    private bool modoEdicion = false;
+    private int? idPendienteEliminar = null;
+    private string? mensajeError;
+    private string? mensajeExito;
+
+    private class PartidoFormModel
+    {
+        public int ID_Partido { get; set; }
+        public int ID_Torneo { get; set; }
+        public DateTime Fecha { get; set; } = DateTime.Now;
+        public int Equipo_Local { get; set; }
+        public int Equipo_Visitante { get; set; }
+        public string? Lugar { get; set; }
+        public string Estado { get; set; } = "Programado";
+        public int Goles_Local { get; set; }
+        public int Goles_Visitante { get; set; }
+    }
+
+    protected override void OnInitialized()
+    {
+        if (!Sesion.EstaAutenticado || !Sesion.EsAdministrador) return;
+        torneos = DbContext.Torneos.OrderByDescending(t => t.Fecha_Inicio).ToList();
+        equipos = DbContext.Equipos.OrderBy(e => e.Nombre_Equipo).ToList();
+        CargarPartidos();
+    }
+
+    private void CargarPartidos()
+    {
+        partidos = DbContext.Partidos.OrderByDescending(p => p.Fecha).ToList();
+    }
+
+    private string ObtenerNombreTorneo(int idTorneo)
+    {
+        return torneos.FirstOrDefault(t => t.ID_Torneo == idTorneo)?.Nombre ?? "Desconocido";
+    }
+
+    private string ObtenerNombreEquipo(int idEquipo)
+    {
+        return equipos.FirstOrDefault(e => e.ID_Equipo == idEquipo)?.Nombre_Equipo ?? "Desconocido";
+    }
+
+    private string ClaseEstado(string estado) => estado switch
+    {
+        "Programado" => "pill-empate",
+        "EnJuego" => "pill-amarilla",
+        "Finalizado" => "pill-victoria",
+        _ => "pill-empate"
+    };
+
+    private void OnTorneoCambiado()
+    {
+        CargarEquiposDelTorneo(formModel.ID_Torneo);
+    }
+
+    private void CargarEquiposDelTorneo(int idTorneo)
+    {
+        var idsInscritos = DbContext.Torneo_Equipo
+            .Where(te => te.ID_Torneo == idTorneo)
+            .Select(te => te.ID_Equipo)
+            .ToList();
+
+        equiposDelTorneo = equipos.Where(e => idsInscritos.Contains(e.ID_Equipo)).ToList();
+    }
+
+    private void MostrarFormularioNuevo()
+    {
+        formModel = new PartidoFormModel();
+        equiposDelTorneo = new();
+        modoEdicion = false;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+    }
+
+    private void EditarPartido(Partido partido)
+    {
+        formModel = new PartidoFormModel
+        {
+            ID_Partido = partido.ID_Partido,
+            ID_Torneo = partido.ID_Torneo,
+            Fecha = partido.Fecha,
+            Equipo_Local = partido.Equipo_Local,
+            Equipo_Visitante = partido.Equipo_Visitante,
+            Lugar = partido.Lugar,
+            Estado = partido.Estado,
+            Goles_Local = partido.Goles_Local,
+            Goles_Visitante = partido.Goles_Visitante
+        };
+        CargarEquiposDelTorneo(partido.ID_Torneo);
+        modoEdicion = true;
+        mostrarFormulario = true;
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+    }
+
+    private void CancelarFormulario()
+    {
+        mostrarFormulario = false;
+        mensajeError = null;
+    }
+
+    private async Task GuardarPartido()
+    {
+        mensajeError = null;
+
+        if (formModel.ID_Torneo == 0)
+        {
+            mensajeError = "Debes seleccionar un torneo.";
+            return;
+        }
+
+        if (formModel.Equipo_Local == 0 || formModel.Equipo_Visitante == 0)
+        {
+            mensajeError = "Debes seleccionar ambos equipos.";
+            return;
+        }
+
+        if (formModel.Equipo_Local == formModel.Equipo_Visitante)
+        {
+            mensajeError = "El equipo local y el visitante no pueden ser el mismo.";
+            return;
+        }
+
+        bool localInscrito = DbContext.Torneo_Equipo.Any(te => te.ID_Torneo == formModel.ID_Torneo && te.ID_Equipo == formModel.Equipo_Local);
+        bool visitanteInscrito = DbContext.Torneo_Equipo.Any(te => te.ID_Torneo == formModel.ID_Torneo && te.ID_Equipo == formModel.Equipo_Visitante);
+
+        if (!localInscrito || !visitanteInscrito)
+        {
+            mensajeError = "Ambos equipos deben estar inscritos en el torneo seleccionado.";
+            return;
+        }
+
+        if (formModel.Goles_Local < 0 || formModel.Goles_Visitante < 0)
+        {
+            mensajeError = "Los goles no pueden ser negativos.";
+            return;
+        }
+
+        if (modoEdicion)
+        {
+            var partido = DbContext.Partidos.FirstOrDefault(p => p.ID_Partido == formModel.ID_Partido);
+            if (partido == null)
+            {
+                mensajeError = "El partido que intentas editar ya no existe.";
+                return;
+            }
+
+            partido.ID_Torneo = formModel.ID_Torneo;
+            partido.Fecha = formModel.Fecha;
+            partido.Equipo_Local = formModel.Equipo_Local;
+            partido.Equipo_Visitante = formModel.Equipo_Visitante;
+            partido.Lugar = formModel.Lugar;
+            partido.Estado = formModel.Estado;
+            partido.Goles_Local = formModel.Goles_Local;
+            partido.Goles_Visitante = formModel.Goles_Visitante;
+        }
+        else
+        {
+            var nuevoPartido = new Partido
+            {
+                ID_Torneo = formModel.ID_Torneo,
+                Fecha = formModel.Fecha,
+                Equipo_Local = formModel.Equipo_Local,
+                Equipo_Visitante = formModel.Equipo_Visitante,
+                Lugar = formModel.Lugar,
+                Estado = formModel.Estado,
+                Goles_Local = formModel.Goles_Local,
+                Goles_Visitante = formModel.Goles_Visitante
+            };
+
+            DbContext.Partidos.Add(nuevoPartido);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = modoEdicion ? "Partido actualizado exitosamente." : "Partido programado exitosamente.";
+        mostrarFormulario = false;
+        CargarPartidos();
+    }
+
+    private void SolicitarEliminarPartido(int idPartido)
+    {
+        idPendienteEliminar = idPartido;
+        mensajeError = null;
+        mensajeExito = null;
+    }
+
+    private void CancelarEliminar()
+    {
+        idPendienteEliminar = null;
+    }
+
+    private async Task ConfirmarEliminarPartido(int idPartido)
+    {
+        mensajeError = null;
+        mensajeExito = null;
+        idPendienteEliminar = null;
+
+        var estadisticasAsociadas = DbContext.Estadisticas.Where(e => e.ID_Partido == idPartido);
+        DbContext.Estadisticas.RemoveRange(estadisticasAsociadas);
+
+        var partido = DbContext.Partidos.FirstOrDefault(p => p.ID_Partido == idPartido);
+        if (partido != null)
+        {
+            DbContext.Partidos.Remove(partido);
+        }
+
+        await DbContext.SaveChangesAsync();
+
+        mensajeExito = "Partido eliminado exitosamente.";
+        CargarPartidos();
+    }
+
+    private void VolverPanel()
+    {
+        Navigation.NavigateTo("/principal");
+    }
+}

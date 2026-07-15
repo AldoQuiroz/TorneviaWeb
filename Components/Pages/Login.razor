@@ -1,7 +1,7 @@
 ﻿@page "/login"
-@rendermode InteractiveServer
 @using TorneviaWeb.Models
 @using TorneviaWeb.Components.Shared
+@using Microsoft.EntityFrameworkCore
 @inject TorneviaDbContext DbContext
 @inject PasswordHasherService PasswordHasher
 @inject SesionUsuario Sesion
@@ -31,7 +31,16 @@
                 <div class="login-error">@mensajeError</div>
             }
 
-            <button type="submit" class="login-btn">Iniciar Sesión</button>
+            <button type="submit" class="login-btn" disabled="@cargando">
+                @if (cargando)
+                {
+                    <span class="spinner-inline"></span><text>Iniciando sesión...</text>
+                }
+                else
+                {
+                    <text>Iniciar Sesión</text>
+                }
+            </button>
         </EditForm>
 
         <p class="login-footer">¿No tienes cuenta? <a href="/registro">Regístrate aquí</a></p>
@@ -41,6 +50,7 @@
 @code {
     private LoginModel loginModel = new();
     private string? mensajeError;
+    private bool cargando = false;
 
     private class LoginModel
     {
@@ -58,11 +68,15 @@
             return;
         }
 
-        var usuario = DbContext.Usuarios.FirstOrDefault(u => u.Email == loginModel.Email);
+        cargando = true;
+        await Task.Yield();
+
+        var usuario = await DbContext.Usuarios.FirstOrDefaultAsync(u => u.Email == loginModel.Email);
 
         if (usuario == null)
         {
             mensajeError = "El correo ingresado no está registrado.";
+            cargando = false;
             return;
         }
 
@@ -71,6 +85,7 @@
         if (!esValida)
         {
             mensajeError = "La contraseña ingresada es incorrecta.";
+            cargando = false;
             return;
         }
 

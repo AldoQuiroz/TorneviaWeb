@@ -469,6 +469,7 @@ body {
 }
 
 .login-label {
+    display: block;
     font-size: 0.82rem;
     font-weight: 600;
     color: #374151;
@@ -477,6 +478,8 @@ body {
 }
 
 .login-input {
+    width: 100%;
+    box-sizing: border-box;
     padding: 11px 14px;
     border: 1.5px solid #d1d5db;
     border-radius: 8px;
@@ -517,6 +520,31 @@ body {
         transform: translateY(-1px);
         box-shadow: 0 8px 20px rgba(11,37,69,0.3);
     }
+
+    .login-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+.spinner-inline {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin-inline 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin-inline {
+    to {
+        transform: rotate(360deg);
+    }
+}
 
 .login-footer {
     text-align: center;
@@ -572,4 +600,248 @@ body {
     padding: 10px 12px;
     border-radius: 6px;
     margin-top: 14px;
+}
+
+/* ===== Panel de Administración ===== */
+.admin-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.admin-menu-card {
+    background: var(--gris-fondo);
+    border-radius: 8px;
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+    .admin-menu-card:hover {
+        transform: translateY(-3px);
+        background: #e8eef5;
+    }
+
+.admin-menu-icono {
+    font-size: 1.8rem;
+}
+
+.admin-menu-titulo {
+    font-weight: 700;
+    color: var(--azul-oscuro);
+}
+
+.admin-menu-desc {
+    font-size: 0.8rem;
+    color: var(--gris-texto);
+}
+
+.admin-menu-deshabilitada {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+    .admin-menu-deshabilitada:hover {
+        transform: none;
+        background: var(--gris-fondo);
+    }
+
+/* ===== Formularios de administración (Equipos, Torneos, etc.) ===== */
+.btn-primario {
+    background: linear-gradient(135deg, #1E5AA8, #0B2545);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+    .btn-primario:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px rgba(11,37,69,0.25);
+    }
+
+.btn-peligro {
+    background: #fdecec;
+    color: var(--rojo-alerta);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+    .btn-peligro:hover {
+        background: #fbd5d5;
+    }
+
+.admin-form {
+    background: var(--gris-fondo);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 16px;
+}
+
+.admin-form-titulo {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #374151;
+    margin-bottom: 10px;
+}
+
+.admin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 4px 16px;
+    align-items: start;
+}
+
+.admin-form-campo {
+    display: flex;
+    flex-direction: column;
+}
+
+    .admin-form-campo textarea.login-input {
+        resize: vertical;
+    }
+
+.admin-form-campo-full {
+    grid-column: 1 / -1;
+}
+
+.admin-form-acciones {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.admin-acciones-tabla {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-confirmar-texto {
+    font-size: 0.8rem;
+    color: var(--rojo-alerta);
+    font-weight: 600;
+}
+
+/* ===== Subpanel de inscripciones (Torneos) ===== */
+.admin-subpanel {
+    background: var(--gris-fondo);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.tags-equipos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.tag-equipo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--blanco);
+    border-radius: 20px;
+    padding: 6px 8px 6px 14px;
+    font-size: 0.85rem;
+    box-shadow: var(--sombra);
+}
+
+.tag-equipo-quitar {
+    background: #fdecec;
+    color: var(--rojo-alerta);
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0;
+}
+
+    .tag-equipo-quitar:hover {
+        background: #fbd5d5;
+    }
+
+.admin-inscribir-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+    max-width: 500px;
+}
+
+    .admin-inscribir-form .login-input {
+        flex: 1;
+    }
+
+/* ===== Estadísticas (Admin) ===== */
+.input-numero-chico {
+    width: 70px;
+    padding: 6px 8px;
+    text-align: center;
+}
+
+.admin-hint {
+    color: var(--gris-texto);
+    font-size: 0.85rem;
+    margin: 12px 0;
+}
+
+/* ===== Logo de equipo (preview y tabla) ===== */
+.admin-logo-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+    .admin-logo-row .login-input {
+        flex: 1;
+    }
+
+.admin-logo-preview {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--gris-fondo);
+    border: 1.5px solid #d1d5db;
+}
+
+.admin-logo-preview-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--rojo-alerta);
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.tabla-logo-equipo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+.tabla-logo-placeholder {
+    font-size: 1.3rem;
+    opacity: 0.4;
 }

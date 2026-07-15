@@ -1,5 +1,4 @@
 @page "/mi-perfil"
-@rendermode InteractiveServer
 @using TorneviaWeb.Models
 @using Microsoft.EntityFrameworkCore
 @using TorneviaWeb.Components.Shared
@@ -35,7 +34,16 @@ else
         <div style="display:flex; gap:20px; padding:20px; border:1px solid #ddd; border-top:none;">
 
             <div style="min-width:220px;">
-                <div style="background:linear-gradient(#4a90d9,#2ecc71); height:100px; border-radius:6px 6px 0 0;"></div>
+                @if (!string.IsNullOrWhiteSpace(jugador.Equipo?.Logo))
+                {
+                    <div style="height:100px; border-radius:6px 6px 0 0; overflow:hidden; background:#f4f6f8;">
+                        <img src="@jugador.Equipo!.Logo" style="width:100%; height:100%; object-fit:contain;" alt="Logo @jugador.Equipo.Nombre_Equipo" />
+                    </div>
+                }
+                else
+                {
+                    <div style="background:linear-gradient(#4a90d9,#2ecc71); height:100px; border-radius:6px 6px 0 0;"></div>
+                }
                 <div style="background:white; border:1px solid #eee; border-top:none; padding:15px; text-align:center; border-radius:0 0 6px 6px;">
                     <strong>@jugador.Nombre_Jugador</strong><br />
                     <span style="color:gray;">@jugador.Posicion</span><br />
