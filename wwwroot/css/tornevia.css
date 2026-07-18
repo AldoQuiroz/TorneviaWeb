@@ -588,6 +588,121 @@ body {
     font-size: 0.9rem;
 }
 
+.perfil-container {
+    max-width: 900px;
+    margin: 30px auto;
+    padding: 0 20px;
+}
+
+.perfil-body {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    background: var(--blanco);
+    border: 1px solid #ddd;
+    border-top: none;
+}
+
+.perfil-sidebar {
+    min-width: 220px;
+    flex-shrink: 0;
+}
+
+.perfil-sidebar-banner {
+    height: 100px;
+    border-radius: 6px 6px 0 0;
+    overflow: hidden;
+    background: var(--gris-fondo);
+}
+
+    .perfil-sidebar-banner img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+.perfil-sidebar-banner-vacio {
+    height: 100px;
+    border-radius: 6px 6px 0 0;
+    background: linear-gradient(#4a90d9, #2ecc71);
+}
+
+.perfil-sidebar-info {
+    background: var(--blanco);
+    border: 1px solid #eee;
+    border-top: none;
+    padding: 15px;
+    text-align: center;
+    border-radius: 0 0 6px 6px;
+}
+
+.perfil-sidebar-posicion {
+    color: var(--gris-texto);
+}
+
+.perfil-sidebar-equipo {
+    color: var(--azul-primario);
+}
+
+.perfil-menu {
+    margin-top: 15px;
+    background: #eef4fb;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.perfil-menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+}
+
+.perfil-menu-item-activo {
+    padding: 10px 15px;
+    background: #dce8f7;
+    font-weight: bold;
+}
+
+.perfil-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.perfil-stats-row {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.perfil-stat-card {
+    flex: 1;
+    text-align: center;
+    background: var(--blanco);
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.perfil-stat-valor {
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.perfil-stat-label {
+    color: var(--gris-texto);
+}
+
+.perfil-color-goles { color: var(--verde-exito); }
+.perfil-color-asistencias { color: #2980b9; }
+.perfil-color-partidos { color: #8e44ad; }
+.perfil-color-amarillas { color: #e67e22; }
+
+.perfil-historial-card {
+    background: var(--blanco);
+    border: 1px solid #eee;
+    border-radius: 6px;
+    padding: 15px;
+}
+
 /* ===== Registro ===== */
 .registro-card {
     max-width: 420px;
@@ -844,4 +959,165 @@ body {
 .tabla-logo-placeholder {
     font-size: 1.3rem;
     opacity: 0.4;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 768px) {
+    .stats-container,
+    .cal-container,
+    .noticias-container {
+        margin: 16px auto;
+        padding: 0 12px;
+    }
+
+    .stats-header,
+    .cal-header,
+    .noticias-header,
+    .perfil-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .resumen-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .admin-menu-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .admin-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-inscribir-form {
+        flex-direction: column;
+        align-items: stretch;
+        max-width: none;
+    }
+
+    .admin-logo-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-acciones-tabla {
+        gap: 6px;
+    }
+
+    /* Tablas: en vez de romper el layout, permiten scroll horizontal */
+    .tabla-detalle {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .grafico-barras {
+        gap: 8px;
+        overflow-x: auto;
+    }
+
+    .login-card {
+        padding: 30px 22px 24px;
+    }
+
+    /* Mi Perfil (Jugador): sidebar pasa a ir arriba del contenido */
+    .perfil-container {
+        margin: 16px auto;
+        padding: 0 12px;
+    }
+
+    .perfil-body {
+        flex-direction: column;
+        padding: 14px;
+        gap: 14px;
+    }
+
+    .perfil-sidebar {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .perfil-stats-row {
+        flex-wrap: wrap;
+    }
+
+    .perfil-stat-card {
+        flex: 1 1 40%;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .stats-header h2,
+    .cal-header h2,
+    .noticias-header h2 {
+        font-size: 1.1rem;
+    }
+
+    .resumen-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .resumen-valor {
+        font-size: 1.5rem;
+    }
+
+    .admin-menu-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Calendario: se reduce el tamaño de celda en vez de romper el grid de 7 columnas */
+    .cal-grid-dias {
+        gap: 3px;
+    }
+
+    .cal-dia-nombre {
+        font-size: 0.65rem;
+    }
+
+    .cal-celda {
+        font-size: 0.7rem;
+        border-radius: 5px;
+    }
+
+    .cal-numero-dia {
+        font-size: 0.75rem;
+    }
+
+    .cal-punto-partido {
+        width: 5px;
+        height: 5px;
+    }
+
+    .cal-nav {
+        gap: 12px;
+    }
+
+    .cal-mes-actual {
+        min-width: 120px;
+        font-size: 1rem;
+    }
+
+    .login-card {
+        padding: 26px 18px 20px;
+    }
+
+    .login-marca {
+        font-size: 1.25rem;
+    }
+
+    .perfil-stat-card {
+        flex: 1 1 100%;
+        padding: 10px;
+    }
+
+    .perfil-stat-valor {
+        font-size: 1.5rem;
+    }
 }
