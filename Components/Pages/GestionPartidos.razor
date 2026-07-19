@@ -320,6 +320,20 @@ else
             return;
         }
 
+        var equiposEnJuego = new[] { formModel.Equipo_Local, formModel.Equipo_Visitante };
+
+        var conflicto = DbContext.Partidos
+            .Where(p => p.Fecha == formModel.Fecha)
+            .Where(p => p.ID_Partido != formModel.ID_Partido)
+            .FirstOrDefault(p => equiposEnJuego.Contains(p.Equipo_Local) || equiposEnJuego.Contains(p.Equipo_Visitante));
+
+        if (conflicto != null)
+        {
+            int idEquipoConflicto = equiposEnJuego.Contains(conflicto.Equipo_Local) ? conflicto.Equipo_Local : conflicto.Equipo_Visitante;
+            mensajeError = $"El equipo {ObtenerNombreEquipo(idEquipoConflicto)} ya tiene un partido programado en esa fecha y hora.";
+            return;
+        }
+
         if (formModel.Goles_Local < 0 || formModel.Goles_Visitante < 0)
         {
             mensajeError = "Los goles no pueden ser negativos.";
