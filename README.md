@@ -71,7 +71,7 @@ El fútbol amateur en Chile suele organizarse mediante herramientas informales (
 - 📊 **Estadísticas en tiempo real**: goles, asistencias, tarjetas y minutos jugados, con actualización automática del marcador y de la tabla de posiciones.
 - 🗓️ **Calendario** de partidos programados, en juego y finalizados.
 - 📰 **Módulo de noticias** para comunicados de la liga.
-- 📱 **Diseño responsive** construido con HTML5 y CSS3 puro (sin frameworks de estilos), validado en anchos de 768px, 480px, 375px y 320px.
+- 📱 **Diseño responsive** construido con HTML y CSS puro (sin frameworks de estilos).
 - ☁️ **Desplegado en producción** en Azure App Service con base de datos Azure SQL.
 
 ## 🛠 Stack tecnológico
@@ -82,7 +82,7 @@ El fútbol amateur en Chile suele organizarse mediante herramientas informales (
 | Backend / lógica de negocio | C#, arquitectura orientada a objetos |
 | Acceso a datos | Entity Framework Core 8 (`TorneviaDbContext`) |
 | Base de datos | SQL Server / Azure SQL Database (3FN, 8 tablas relacionadas) |
-| Autenticación | `PasswordHasher<T>` de ASP.NET Identity |
+| Autenticación | `PasswordHasher` de ASP.NET Identity |
 | Hosting | Azure App Service (Windows, plan Free F1) + Azure SQL Database |
 | Control de versiones | Git / GitHub |
 
@@ -91,15 +91,15 @@ El fútbol amateur en Chile suele organizarse mediante herramientas informales (
 El sistema sigue una arquitectura por capas orientada a objetos:
 
 ```
-┌─────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────────────────────────────┐
 │  Presentación   → Blazor Server (.razor + CSS responsive)
-├─────────────────────────────────────────────┤
+├─────────────────────────────────────────────────────────────────────────┤
 │  Lógica de negocio → C# (SesionUsuario, PasswordHasherService)
-├─────────────────────────────────────────────┤
+├─────────────────────────────────────────────────────────────────────────┤
 │  Acceso a datos → Entity Framework Core (TorneviaDbContext)
-├─────────────────────────────────────────────┤
+├─────────────────────────────────────────────────────────────────────────┤
 │  Base de datos → SQL Server / Azure SQL Database
-└─────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## 🗂 Modelo de datos
@@ -211,7 +211,7 @@ El control de acceso se implementa mediante **RBAC** (Role-Based Access Control)
 
 ## 🔒 Seguridad
 
-- Contraseñas cifradas con hash seguro (`PasswordHasher<T>` de ASP.NET Identity), nunca almacenadas en texto plano.
+- Contraseñas cifradas con hash seguro (`PasswordHasher` de ASP.NET Identity), nunca almacenadas en texto plano.
 - HTTPS forzado en producción (`UseHttpsRedirection` + `UseHsts`).
 - Autorización por rol (RBAC) para restringir el acceso a los módulos administrativos.
 - Cumplimiento de la Ley N° 19.628 sobre Protección de la Vida Privada y su actualización mediante la Ley N° 21.719.
@@ -221,9 +221,6 @@ El control de acceso se implementa mediante **RBAC** (Role-Based Access Control)
 - El hosting corresponde al plan gratuito de Azure App Service (**F1**), sin *Always On*, por lo que la aplicación puede "dormir" tras ~20 minutos de inactividad. Se prioriza el cumplimiento del requisito de hosting gratuito por sobre la eliminación de esta limitación.
 - No se incluye gestión de pagos ni comercio electrónico en esta versión.
 
-## 📄 Licencia
-
-Este proyecto está distribuido bajo la licencia [MIT](LICENSE).
 
 ## 👨‍💻 Autor
 
